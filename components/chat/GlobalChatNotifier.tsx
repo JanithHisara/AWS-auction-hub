@@ -16,8 +16,7 @@ export default function GlobalChatNotifier({ userId, role }: { userId?: string; 
   const [notifications, setNotifications] = useState<Notification[]>([])
   const supabase = createClient()
 
-  const isGlobalAdmin = role === 'admin' || role === 'super_admin' || role === 'moderator', setNotifications] = useState<Notification[]>([])
-  const supabase = createClient()
+  const isGlobalAdmin = role === 'admin' || role === 'super_admin' || role === 'moderator'
 
   useEffect(() => {
     if (!userId || !isGlobalAdmin) return
