@@ -1,44 +1,49 @@
 {
-    "name":  "gem-auction",
-    "version":  "0.1.0",
-    "private":  true,
-    "scripts":  {
-                    "dev":  "next dev",
-                    "build":  "next build",
-                    "start":  "next start",
-                    "lint":  "eslint",
-                    "sst":  "sst",
-                    "deploy":  "sst deploy",
-                    "cdk:synth":  "cd cdk \u0026\u0026 npx cdk synth --profile gem-auction",
-                    "cdk:diff":  "cd cdk \u0026\u0026 npx cdk diff --profile gem-auction",
-                    "cdk:deploy":  "cd cdk \u0026\u0026 npx cdk deploy --profile gem-auction --require-approval never",
-                    "cdk:destroy":  "cd cdk \u0026\u0026 npx cdk destroy --profile gem-auction"
-                },
-    "dependencies":  {
-                         "@supabase/ssr":  "^0.7.0",
-                         "@supabase/supabase-js":  "^2.80.0",
-                         "clsx":  "^2.1.1",
-                         "date-fns":  "^4.1.0",
-                         "decimal.js":  "^10.6.0",
-                         "dotenv":  "^17.4.2",
-                         "lucide-react":  "^0.555.0",
-                         "next":  "16.0.10",
-                         "react":  "19.2.0",
-                         "react-dom":  "19.2.0",
-                         "resend":  "^6.5.2",
-                         "sst":  "^3.17.23",
-                         "tailwind-merge":  "^3.4.0",
-                         "@aws-sdk/client-iot-data-plane":  "^3.400.0"
-                     },
-    "devDependencies":  {
-                            "@tailwindcss/postcss":  "^4",
-                            "@types/node":  "^20",
-                            "@types/react":  "^19",
-                            "@types/react-dom":  "^19",
-                            "baseline-browser-mapping":  "^2.11.20",
-                            "eslint":  "^9",
-                            "eslint-config-next":  "16.0.1",
-                            "tailwindcss":  "^4",
-                            "typescript":  "^5"
-                        }
+    "name": "gem-auction",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "eslint",
+        "sst": "sst",
+        "deploy": "sst deploy",
+        "cdk:synth": "cd cdk && npx cdk synth --profile gem-auction",
+        "cdk:diff": "cd cdk && npx cdk diff --profile gem-auction",
+        "cdk:deploy": "cd cdk && npx cdk deploy --profile gem-auction --require-approval never",
+        "cdk:destroy": "cd cdk && npx cdk destroy --profile gem-auction"
+    },
+    "dependencies": {
+        "@aws-sdk/client-iot-data-plane": "^3.400.0",
+        "@supabase/ssr": "^0.7.0",
+        "@supabase/supabase-js": "^2.80.0",
+        "clsx": "^2.1.1",
+        "date-fns": "^4.1.0",
+        "decimal.js": "^10.6.0",
+        "dotenv": "^17.4.2",
+        "lucide-react": "^0.555.0",
+        "next": "^16.4.0",
+        "react": "19.2.0",
+        "react-dom": "19.2.0",
+        "resend": "^6.32.1",
+        "sst": "^4.17.2",
+        "tailwind-merge": "^3.4.0"
+    },
+    "devDependencies": {
+        "@tailwindcss/postcss": "^4",
+        "@types/node": "^20",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "baseline-browser-mapping": "^2.11.20",
+        "eslint": "^9",
+        "eslint-config-next": "^14.2.35",
+        "tailwindcss": "^4",
+        "typescript": "^5"
+    },
+    "allowScripts": {
+        "aws-sdk@2.1692.0": true,
+        "sharp@0.34.5": true,
+        "unrs-resolver@1.11.1": true
+    }
 }
