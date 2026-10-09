@@ -16,6 +16,7 @@
     },
     "dependencies": {
         "@aws-sdk/client-iot-data-plane": "^3.400.0",
+        "@aws-sdk/client-s3": "^3.1148.0",
         "@supabase/ssr": "^0.7.0",
         "@supabase/supabase-js": "^2.80.0",
         "clsx": "^2.1.1",

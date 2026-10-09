@@ -1,7 +1,7 @@
-import { createAdminClient } from '@/lib/supabase/admin'
-import { requirePermission } from '@/lib/auth'
+﻿import { requirePermission } from '@/lib/auth'
 import { PERMISSIONS } from '@/lib/permissions'
 import { NextRequest, NextResponse } from 'next/server'
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024   // 5MB
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024  // 50MB
@@ -17,10 +17,14 @@ function getMediaType(mimeType: string): 'image' | 'gif' | 'video' {
   return 'image'
 }
 
+const s3Client = new S3Client({
+  region: process.env.NEXT_PUBLIC_AWS_REGION || 'ap-south-1'
+})
+const BUCKET_NAME = process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME || 'auctionhubinfrastack-auctionhubstoragef3f7ccb4-xf4fq38uod11'
+
 export async function POST(request: NextRequest) {
   try {
     await requirePermission(PERMISSIONS.UPLOAD_FILES)
-    const supabase = createAdminClient()
 
     const formData = await request.formData()
     const file = formData.get('file') as File
@@ -45,26 +49,27 @@ export async function POST(request: NextRequest) {
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
     const filePath = mediaType === 'video' ? `gems/videos/${fileName}` : `gems/${fileName}`
 
-    const { data, error } = await supabase.storage
-      .from('gem-images')
-      .upload(filePath, file, {
-        contentType: file.type,
-        upsert: false,
-      })
+    // Read file buffer
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
 
-    if (error) {
-      console.error('Upload error:', error)
-      return NextResponse.json({ message: 'Upload failed: ' + error.message }, { status: 500 })
-    }
+    // Upload to AWS S3
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: filePath,
+      Body: buffer,
+      ContentType: file.type,
+    })
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('gem-images')
-      .getPublicUrl(data.path)
+    await s3Client.send(command)
+
+    // Construct public AWS S3 URL
+    const publicUrl = `https://${BUCKET_NAME}.s3.ap-south-1.amazonaws.com/${filePath}`
 
     return NextResponse.json({
       success: true,
       url: publicUrl,
-      path: data.path,
+      path: filePath,
       media_type: mediaType,
     })
 
