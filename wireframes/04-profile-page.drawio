@@ -1,0 +1,74 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Profile Page" id="profile-page">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Browser Frame -->
+        <mxCell id="frame" value="" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=#666666;fillColor=#f8f7f5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="820" height="520" as="geometry" />
+        </mxCell>
+        
+        <!-- Navbar -->
+        <mxCell id="navbar" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="820" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="logo" value="LUXBID Reserve" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#D4AF37;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="60" y="55" width="150" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="nav-links" value="ADMIN | MY BIDS | PROFILE | LOGOUT" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#888888;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="55" width="240" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Profile Card -->
+        <mxCell id="profile-card" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#E8E0D0;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="150" y="140" width="600" height="380" as="geometry" />
+        </mxCell>
+        
+        <!-- Title -->
+        <mxCell id="title" value="Profile" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontStyle=1;fontSize=24;" vertex="1" parent="1">
+          <mxGeometry x="180" y="170" width="200" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Email Field -->
+        <mxCell id="email-label" value="Email" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#888888;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="180" y="230" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="email-value" value="user@example.com" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="180" y="250" width="300" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- Role Field -->
+        <mxCell id="role-label" value="Role" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#888888;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="180" y="295" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="role-value" value="User" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="180" y="315" width="200" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- Member Since Field -->
+        <mxCell id="member-label" value="Member Since" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#888888;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="180" y="360" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="member-value" value="November 15, 2024" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="180" y="380" width="200" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- Total Bids Field -->
+        <mxCell id="bids-label" value="Total Bids" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#888888;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="180" y="425" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="bids-value" value="12" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="180" y="445" width="100" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- Page Title -->
+        <mxCell id="page-title" value="PROFILE PAGE" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="200" height="25" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+

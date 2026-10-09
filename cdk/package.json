@@ -1,0 +1,28 @@
+{
+  "name": "gem-auction-iot-infra",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "diff": "cdk diff",
+    "destroy": "cdk destroy"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.80.0",
+    "aws-cdk-lib": "^2.180.0",
+    "constructs": "^10.4.2"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-iot": "^3.1004.0",
+    "@aws-sdk/client-iot-data-plane": "^3.1004.0",
+    "@aws-sdk/client-secrets-manager": "^3.1004.0",
+    "@types/aws-lambda": "^8.10.147",
+    "@types/node": "^22.0.0",
+    "aws-cdk": "^2.180.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,96 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Admin Dashboard" id="admin-dashboard">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Browser Frame -->
+        <mxCell id="frame" value="" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=#666666;fillColor=#f8f7f5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1120" height="620" as="geometry" />
+        </mxCell>
+        
+        <!-- Navbar -->
+        <mxCell id="navbar" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="logo" value="LUXBID Reserve" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontColor=#D4AF37;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="60" y="55" width="150" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="nav-links" value="ADMIN | MY BIDS | PROFILE | LOGOUT" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontColor=#888888;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="880" y="55" width="260" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Admin Title -->
+        <mxCell id="title" value="Admin Dashboard" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontColor=#333333;fontStyle=1;fontSize=24;" vertex="1" parent="1">
+          <mxGeometry x="80" y="120" width="300" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Stats Grid - Row 1 -->
+        <mxCell id="stat1" value="Total Gems&#xa;&#xa;12" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EBF5FF;strokeColor=#BFDBFE;fontSize=14;fontStyle=1;verticalAlign=top;align=center;" vertex="1" parent="1">
+          <mxGeometry x="80" y="180" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="stat1-value" value="12" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontColor=#2563EB;fontStyle=1;fontSize=28;" vertex="1" parent="1">
+          <mxGeometry x="80" y="220" width="200" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stat2" value="Active Auctions&#xa;&#xa;3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#A7F3D0;fontSize=14;fontStyle=1;verticalAlign=top;align=center;" vertex="1" parent="1">
+          <mxGeometry x="300" y="180" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="stat2-value" value="3" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontColor=#16A34A;fontStyle=1;fontSize=28;" vertex="1" parent="1">
+          <mxGeometry x="300" y="220" width="200" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stat3" value="Completed&#xa;&#xa;8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#E9D5FF;fontSize=14;fontStyle=1;verticalAlign=top;align=center;" vertex="1" parent="1">
+          <mxGeometry x="520" y="180" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="stat3-value" value="8" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontColor=#9333EA;fontStyle=1;fontSize=28;" vertex="1" parent="1">
+          <mxGeometry x="520" y="220" width="200" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Stats Grid - Row 2 -->
+        <mxCell id="stat4" value="Total Bids&#xa;&#xa;47" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#D4AF37;fontSize=14;fontStyle=1;verticalAlign=top;align=center;" vertex="1" parent="1">
+          <mxGeometry x="740" y="180" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="stat4-value" value="47" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontColor=#8B7355;fontStyle=1;fontSize=28;" vertex="1" parent="1">
+          <mxGeometry x="740" y="220" width="200" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stat5" value="Draft Gems&#xa;&#xa;1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#FDE68A;fontSize=14;fontStyle=1;verticalAlign=top;align=center;" vertex="1" parent="1">
+          <mxGeometry x="960" y="180" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="stat5-value" value="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontColor=#CA8A04;fontStyle=1;fontSize=28;" vertex="1" parent="1">
+          <mxGeometry x="960" y="220" width="180" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Total Value (Wide) -->
+        <mxCell id="stat6" value="Total Value" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#D4AF37;fontSize=14;fontStyle=1;verticalAlign=top;align=center;" vertex="1" parent="1">
+          <mxGeometry x="80" y="300" width="420" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="stat6-value" value="$145,200" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontColor=#8B7355;fontStyle=1;fontSize=28;" vertex="1" parent="1">
+          <mxGeometry x="80" y="340" width="420" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Quick Actions Card -->
+        <mxCell id="actions-card" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#E8E0D0;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="430" width="1060" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="actions-title" value="Quick Actions" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontColor=#333333;fontStyle=1;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="110" y="450" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="new-gem-btn" value="Create New Gem" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#8B7355;strokeColor=none;fontColor=#ffffff;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="495" width="180" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="view-gems-btn" value="View All Gems" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#E8E0D0;fontColor=#333333;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="310" y="495" width="180" height="45" as="geometry" />
+        </mxCell>
+        
+        <!-- Page Title -->
+        <mxCell id="page-title" value="ADMIN DASHBOARD - Statistics Overview" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontColor=#333333;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="350" height="25" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+

@@ -1,0 +1,174 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Gem Detail Page" id="gem-detail-page">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Browser Frame -->
+        <mxCell id="frame" value="" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=#666666;fillColor=#f8f7f5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1320" height="1020" as="geometry" />
+        </mxCell>
+        
+        <!-- Navbar -->
+        <mxCell id="navbar" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="logo" value="LUXBID Reserve" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#D4AF37;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="60" y="55" width="150" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Breadcrumb -->
+        <mxCell id="breadcrumb" value="Home / Blue Sapphire Ring" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#888888;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="120" width="300" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- Title -->
+        <mxCell id="title" value="Blue Sapphire Ring" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontStyle=1;fontSize=32;" vertex="1" parent="1">
+          <mxGeometry x="80" y="145" width="500" height="45" as="geometry" />
+        </mxCell>
+        
+        <!-- Live Badge -->
+        <mxCell id="live-badge" value="● Live Auction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#D4AF37;fontSize=11;fontColor=#8B7355;" vertex="1" parent="1">
+          <mxGeometry x="80" y="195" width="120" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Main Content Grid -->
+        <!-- Left Column - Image Gallery -->
+        <mxCell id="img-card" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#E8E0D0;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="250" width="700" height="450" as="geometry" />
+        </mxCell>
+        
+        <!-- Main Image -->
+        <mxCell id="main-img" value="[MAIN GEM IMAGE]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0ebe5;strokeColor=none;fontColor=#999999;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="100" y="270" width="660" height="340" as="geometry" />
+        </mxCell>
+        
+        <!-- Timer on Image -->
+        <mxCell id="img-timer" value="⏱ Ends In&#xa;2h 35m 12s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#D4AF37;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="290" width="120" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Thumbnails -->
+        <mxCell id="thumb1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0ebe5;strokeColor=#D4AF37;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="625" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="thumb2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0ebe5;strokeColor=#E8E0D0;" vertex="1" parent="1">
+          <mxGeometry x="210" y="625" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="thumb3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0ebe5;strokeColor=#E8E0D0;" vertex="1" parent="1">
+          <mxGeometry x="320" y="625" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="thumb4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0ebe5;strokeColor=#E8E0D0;" vertex="1" parent="1">
+          <mxGeometry x="430" y="625" width="100" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Right Column - Auction Details -->
+        <mxCell id="auction-card" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#E8E0D0;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="800" y="250" width="520" height="450" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="auction-title" value="Auction Details" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontStyle=1;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="830" y="270" width="200" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Current Price Box -->
+        <mxCell id="price-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#D4AF37;" vertex="1" parent="1">
+          <mxGeometry x="830" y="310" width="460" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="price-label" value="Current Price" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#888888;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="850" y="325" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="price-value" value="$12,500" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#8B7355;fontStyle=1;fontSize=36;" vertex="1" parent="1">
+          <mxGeometry x="850" y="345" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="bid-count" value="5 bids total" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#888888;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="850" y="390" width="100" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- Round Timer -->
+        <mxCell id="round-divider" value="" style="line;strokeWidth=1;fillColor=none;strokeColor=#D4AF37;opacity=30;" vertex="1" parent="1">
+          <mxGeometry x="850" y="415" width="420" height="1" as="geometry" />
+        </mxCell>
+        <mxCell id="round-label" value="Next Round In" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#888888;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="850" y="420" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="round-timer" value="01:45" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#8B7355;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="420" width="80" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- Stats Grid -->
+        <mxCell id="stat-starting" value="Starting Price&#xa;$10,000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#E8E0D0;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="830" y="465" width="220" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="stat-increment" value="Min Increment&#xa;$500" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#E8E0D0;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="465" width="220" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Bid Form -->
+        <mxCell id="bid-input" value="Enter Bid Amount: $13,000" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#E8E0D0;fontSize=12;align=left;" vertex="1" parent="1">
+          <mxGeometry x="830" y="535" width="290" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="bid-btn" value="Place Bid →" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#8B7355;strokeColor=none;fontColor=#ffffff;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="535" width="160" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Register Button -->
+        <mxCell id="register-btn" value="Register to Bid" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#8B7355;fontColor=#8B7355;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="830" y="600" width="460" height="45" as="geometry" />
+        </mxCell>
+        
+        <!-- Specifications Card -->
+        <mxCell id="specs-card" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#E8E0D0;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="800" y="720" width="520" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="specs-title" value="✓ Specifications" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontStyle=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="830" y="740" width="200" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="spec1" value="Carat Weight: 3.2 ct" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#E8E0D0;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="830" y="775" width="220" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="spec2" value="Cut: Oval" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#E8E0D0;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="775" width="220" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="spec3" value="Color: Royal Blue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#E8E0D0;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="830" y="820" width="220" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="spec4" value="Clarity: VVS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#E8E0D0;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="820" width="220" height="35" as="geometry" />
+        </mxCell>
+        
+        <!-- Description Card -->
+        <mxCell id="desc-card" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#E8E0D0;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="720" width="700" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="desc-title" value="Description" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontStyle=1;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="110" y="740" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="desc-text" value="Rare Ceylon sapphire with exceptional clarity and vivid royal blue color. Set in 18k white gold with diamond accents. Certified by GIA with full documentation of provenance. This exceptional piece represents the pinnacle of gem craftsmanship..." style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="775" width="650" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- Bid History Card -->
+        <mxCell id="history-card" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#E8E0D0;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="900" width="700" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="history-title" value="Bid History" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontStyle=1;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="110" y="915" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="bid1" value="$12,500 - Anonymous_123 - 5 min ago" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#E8E0D0;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="110" y="950" width="650" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="bid2" value="$12,000 - Anonymous_456 - 12 min ago" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8f7f5;strokeColor=#E8E0D0;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="110" y="990" width="650" height="35" as="geometry" />
+        </mxCell>
+        
+        <!-- Page Title -->
+        <mxCell id="page-title" value="GEM DETAIL PAGE - Active Auction View" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#333333;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="300" height="25" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+

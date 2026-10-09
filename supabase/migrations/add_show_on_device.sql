@@ -1,0 +1,1 @@
+﻿ALTER TABLE auctions ADD COLUMN show_on_device BOOLEAN DEFAULT FALSE;
