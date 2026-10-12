@@ -9,6 +9,9 @@ import AuctionLobbyClient from '@/components/auctions/AuctionLobbyClient'
 import AuctionItemsPreview from '@/components/auctions/AuctionItemsPreview'
 import LocalTime from '@/components/ui/LocalTime'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 async function getAuction(id: string) {
   const supabase = await createClient()
   
@@ -100,7 +103,12 @@ export default async function AuctionDetailPage({ params }: { params: Promise<{ 
   const canRegister = registrationOpen && !auction.is_registered
 
   return (
-    <AuctionLobbyClient auctionId={auction.id} userId={auction.user_id}>
+    <AuctionLobbyClient 
+      auctionId={auction.id} 
+      userId={auction.user_id}
+      initialStatus={auction.status}
+      initialApprovalStatus={auction.registration?.approval_status}
+    >
     <div className="min-h-screen bg-[var(--background)] relative">
       {/* Background */}
       <div className="fixed inset-0 bg-grid-pattern opacity-30" />

@@ -1,6 +1,8 @@
-﻿'use client'
+'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   targetDate: string
@@ -16,8 +18,11 @@ interface TimeLeft {
 }
 
 export default function AuctionCountdown({ targetDate, label }: Props) {
+  const router = useRouter()
+  const supabase = createClient()
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0, total: 0 })
   const [isClient, setIsClient] = useState(false)
+  const hasTriggeredExpiry = useRef(false)
 
   useEffect(() => {
     setIsClient(true)
@@ -46,6 +51,15 @@ export default function AuctionCountdown({ targetDate, label }: Props) {
 
     return () => clearInterval(timer)
   }, [targetDate])
+
+  useEffect(() => {
+    if (timeLeft.total <= 0 && isClient && !hasTriggeredExpiry.current) {
+      hasTriggeredExpiry.current = true
+      supabase.rpc('process_auction_schedule').finally(() => {
+        router.refresh()
+      })
+    }
+  }, [timeLeft.total, isClient, router, supabase])
 
   if (!isClient) {
     return (

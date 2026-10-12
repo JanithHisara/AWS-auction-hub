@@ -44,7 +44,59 @@ export function isTimestamp(val: any): boolean {
   return typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:\d{2})?)?$/i.test(val)
 }
 
-export function formatSqlPlaceholder(val: any, idx: number): string {
+export function isUuidColumn(colName?: string, tableName?: string): boolean {
+  if (!colName) return false
+  const lowerCol = colName.toLowerCase()
+  if (
+    lowerCol === 'access_token' ||
+    lowerCol === 'token' ||
+    lowerCol === 'session_token' ||
+    lowerCol === 'auction_code' ||
+    lowerCol === 'code' ||
+    lowerCol === 'device_id' ||
+    lowerCol === 'nfc_uid' ||
+    lowerCol === 'content' ||
+    lowerCol === 'password' ||
+    lowerCol === 'password_hash' ||
+    lowerCol === 'email' ||
+    lowerCol === 'name' ||
+    lowerCol === 'title' ||
+    lowerCol === 'status' ||
+    lowerCol === 'role' ||
+    lowerCol === 'phone' ||
+    lowerCol === 'anonymous_name' ||
+    lowerCol === 'display_name' ||
+    lowerCol === 'description' ||
+    lowerCol === 'banner_image_url' ||
+    lowerCol === 'image_url' ||
+    lowerCol === 'certificate_url' ||
+    lowerCol === 'certificate_type' ||
+    lowerCol === 'payment_method' ||
+    lowerCol === 'transaction_id' ||
+    lowerCol === 'group_name' ||
+    lowerCol === 'label'
+  ) {
+    return false
+  }
+  if (tableName === 'sessions' && lowerCol === 'id') {
+    return false
+  }
+  if (lowerCol === 'id' || lowerCol.endsWith('_id') || lowerCol === 'approved_by') {
+    return true
+  }
+  return false
+}
+
+export function formatSqlPlaceholder(val: any, idx: number, colName?: string, tableName?: string): string {
+  if (colName) {
+    if (isUuidColumn(colName, tableName) && isUuid(val)) {
+      return `$${idx}::uuid`
+    }
+    if (isTimestamp(val)) {
+      return `$${idx}::timestamp`
+    }
+    return `$${idx}`
+  }
   if (isUuid(val)) {
     return `$${idx}::uuid`
   }
@@ -185,8 +237,19 @@ export class RpcBuilder {
     return await executeRpc(this.fnName, this.args)
   }
 
-  then(resolve: (value: { data: any; error: any }) => void, reject?: (reason: any) => void) {
+  then<TResult1 = { data: any; error: any }, TResult2 = never>(
+    resolve?: ((value: { data: any; error: any }) => TResult1 | PromiseLike<TResult1>) | null,
+    reject?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+  ) {
     return this.execute().then(resolve, reject)
+  }
+
+  catch<TResult = never>(reject?: ((reason: any) => TResult | PromiseLike<TResult>) | null) {
+    return this.execute().catch(reject)
+  }
+
+  finally(callback?: (() => void) | null) {
+    return this.execute().finally(callback)
   }
 }
 
@@ -361,7 +424,7 @@ export class PostgresQueryBuilder<T = any> {
         if (inVals.length === 0) {
           conditions.push('FALSE')
         } else {
-          const placeholders = inVals.map((v, i) => formatSqlPlaceholder(v, currentIdx + i)).join(', ')
+          const placeholders = inVals.map((v, i) => formatSqlPlaceholder(v, currentIdx + i, f.column, this.table)).join(', ')
           conditions.push(`"${f.column}" IN (${placeholders})`)
           params.push(...inVals)
           currentIdx += inVals.length
@@ -371,13 +434,13 @@ export class PostgresQueryBuilder<T = any> {
         if (inVals.length === 0) {
           // NOT IN empty list is always true
         } else {
-          const placeholders = inVals.map((v, i) => formatSqlPlaceholder(v, currentIdx + i)).join(', ')
+          const placeholders = inVals.map((v, i) => formatSqlPlaceholder(v, currentIdx + i, f.column, this.table)).join(', ')
           conditions.push(`"${f.column}" NOT IN (${placeholders})`)
           params.push(...inVals)
           currentIdx += inVals.length
         }
       } else {
-        const ph = formatSqlPlaceholder(f.value, currentIdx)
+        const ph = formatSqlPlaceholder(f.value, currentIdx, f.column, this.table)
         conditions.push(`"${f.column}" ${f.operator} ${ph}`)
         params.push(f.value)
         currentIdx++
@@ -393,7 +456,7 @@ export class PostgresQueryBuilder<T = any> {
           const col = m[1]
           const op = m[2].toUpperCase()
           const val = m[3]
-          const ph = formatSqlPlaceholder(val, currentIdx)
+          const ph = formatSqlPlaceholder(val, currentIdx, col, this.table)
           subConditions.push(`"${col}" ${op} ${ph}`)
           params.push(val)
           currentIdx++
@@ -443,7 +506,7 @@ export class PostgresQueryBuilder<T = any> {
       const keys = Object.keys(record).filter(k => record[k] !== undefined)
       const values = keys.map(k => record[k])
       const colNames = keys.map(k => `"${k}"`).join(', ')
-      const placeholders = values.map((val, i) => formatSqlPlaceholder(val, i + 1)).join(', ')
+      const placeholders = values.map((val, i) => formatSqlPlaceholder(val, i + 1, keys[i], this.table)).join(', ')
 
       const sql = `INSERT INTO "${this.table}" (${colNames}) VALUES (${placeholders}) RETURNING *`
       const res = await prisma.$queryRawUnsafe<any[]>(sql, ...values)
@@ -472,7 +535,7 @@ export class PostgresQueryBuilder<T = any> {
 
     for (const k of keys) {
       const val = this.payload[k]
-      const ph = formatSqlPlaceholder(val, pIdx)
+      const ph = formatSqlPlaceholder(val, pIdx, k, this.table)
       setClauses.push(`"${k}" = ${ph}`)
       params.push(val)
       pIdx++
@@ -521,7 +584,7 @@ export class PostgresQueryBuilder<T = any> {
     const keys = Object.keys(record).filter(k => record[k] !== undefined)
     const values = keys.map(k => record[k])
     const colNames = keys.map(k => `"${k}"`).join(', ')
-    const placeholders = values.map((val, i) => formatSqlPlaceholder(val, i + 1)).join(', ')
+    const placeholders = values.map((val, i) => formatSqlPlaceholder(val, i + 1, keys[i], this.table)).join(', ')
 
     const conflictCol = keys.includes('user_id') && this.table === 'user_rewards' ? '"user_id"' : '"id"'
     const updateSets = keys.map(k => `"${k}" = EXCLUDED."${k}"`).join(', ')
@@ -662,8 +725,19 @@ export class PostgresQueryBuilder<T = any> {
     return rows
   }
 
-  then(resolve: (value: { data: T; error: any; count?: number }) => void, reject?: (reason: any) => void) {
+  then<TResult1 = { data: T; error: any; count?: number }, TResult2 = never>(
+    resolve?: ((value: { data: T; error: any; count?: number }) => TResult1 | PromiseLike<TResult1>) | null,
+    reject?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+  ) {
     return this.execute().then(resolve as any, reject)
+  }
+
+  catch<TResult = never>(reject?: ((reason: any) => TResult | PromiseLike<TResult>) | null) {
+    return this.execute().catch(reject)
+  }
+
+  finally(callback?: (() => void) | null) {
+    return this.execute().finally(callback)
   }
 }
 

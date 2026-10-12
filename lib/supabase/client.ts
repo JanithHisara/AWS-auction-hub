@@ -26,8 +26,19 @@ class ClientRpcBuilder {
     }
   }
 
-  then(resolve: (value: { data: any; error: any }) => void, reject?: (reason: any) => void) {
+  then<TResult1 = { data: any; error: any }, TResult2 = never>(
+    resolve?: ((value: { data: any; error: any }) => TResult1 | PromiseLike<TResult1>) | null,
+    reject?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+  ) {
     return this.execute().then(resolve, reject)
+  }
+
+  catch<TResult = never>(reject?: ((reason: any) => TResult | PromiseLike<TResult>) | null) {
+    return this.execute().catch(reject)
+  }
+
+  finally(callback?: (() => void) | null) {
+    return this.execute().finally(callback)
   }
 }
 
@@ -215,8 +226,19 @@ class ClientQueryBuilder<T = any> {
     }
   }
 
-  then(resolve: (value: { data: T; error: any; count?: number }) => void, reject?: (reason: any) => void) {
+  then<TResult1 = { data: T; error: any; count?: number }, TResult2 = never>(
+    resolve?: ((value: { data: T; error: any; count?: number }) => TResult1 | PromiseLike<TResult1>) | null,
+    reject?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+  ) {
     return this.execute().then(resolve as any, reject)
+  }
+
+  catch<TResult = never>(reject?: ((reason: any) => TResult | PromiseLike<TResult>) | null) {
+    return this.execute().catch(reject)
+  }
+
+  finally(callback?: (() => void) | null) {
+    return this.execute().finally(callback)
   }
 }
 

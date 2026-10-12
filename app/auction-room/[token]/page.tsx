@@ -1,4 +1,4 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import ProgressiveRoomClient from '@/components/auction-room/ProgressiveRoomClient'
@@ -6,6 +6,9 @@ import TenderRoomClient from '@/components/auction-room/TenderRoomClient'
 import IncrementalRoomClient from '@/components/auction-room/IncrementalRoomClient'
 import { Gem, Bid, Auction, AuctionRegistration, UserRewards, User, GemElimination } from '@/types/database'
 import LocalTime from '@/components/ui/LocalTime'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 type ItemWithRelations = Gem & { gem_images: { image_url: string }[]; bids: Bid[] }
 
@@ -34,6 +37,13 @@ type AccessResult = ValidAccessResult | InvalidAccessResult
 async function validateAccess(token: string): Promise<AccessResult> {
   const supabase = await createClient()
   
+  // Auto-process status transitions on demand (covers scheduled auctions hitting start time)
+  try {
+    await supabase.rpc('process_auction_schedule')
+  } catch (err) {
+    console.error('Failed to process auction schedule on room entry:', err)
+  }
+
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()
   
@@ -55,8 +65,8 @@ async function validateAccess(token: string): Promise<AccessResult> {
     return { valid: false, reason: 'invalid_token' }
   }
 
-  // Verify user matches registration
-  if (registration.user_id !== user.id) {
+  // Verify user matches registration (or user is admin / super_admin)
+  if (registration.user_id !== user.id && user.role !== 'admin' && user.role !== 'super_admin') {
     return { valid: false, reason: 'user_mismatch' }
   }
 

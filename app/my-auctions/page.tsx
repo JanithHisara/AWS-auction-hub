@@ -1,8 +1,11 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { AuctionRegistration, Auction } from '@/types/database'
 import LocalTime from '@/components/ui/LocalTime'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 async function getMyRegistrations() {
   const supabase = await createClient()

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -7,47 +7,89 @@ import { createClient } from '@/lib/supabase/client'
 interface Props {
   auctionId: string
   userId?: string
+  initialStatus?: string
+  initialApprovalStatus?: string
   children: React.ReactNode
 }
 
-export default function AuctionLobbyClient({ auctionId, userId, children }: Props) {
+export default function AuctionLobbyClient({
+  auctionId,
+  userId,
+  initialStatus,
+  initialApprovalStatus,
+  children,
+}: Props) {
   const router = useRouter()
   const supabase = createClient()
   const [notification, setNotification] = useState<{ type: 'approved' | 'live' | 'round_ended' | 'next_round'; message: string } | null>(null)
-  const lastApprovalStatus = useRef<string | null>(null)
+  const lastApprovalStatus = useRef<string | null>(initialApprovalStatus || null)
+  const lastAuctionStatus = useRef<string | null>(initialStatus || null)
+
+  const pollAuctionStatus = useCallback(async () => {
+    try {
+      // Process schedule transitions in case the scheduled start/end time has passed
+      await supabase.rpc('process_auction_schedule').catch(() => {})
+
+      const { data } = await supabase
+        .from('auctions')
+        .select('status')
+        .eq('id', auctionId)
+        .single()
+
+      if (!data) return
+
+      if (lastAuctionStatus.current !== null && data.status !== lastAuctionStatus.current) {
+        const prev = lastAuctionStatus.current
+        lastAuctionStatus.current = data.status
+        if (data.status === 'live' && prev !== 'live') {
+          setNotification({ type: 'live', message: 'The auction is now LIVE! Refreshing...' })
+        }
+        setTimeout(() => router.refresh(), 1000)
+      } else if (lastAuctionStatus.current === null) {
+        lastAuctionStatus.current = data.status
+      }
+    } catch {
+      // Ignore background poll errors
+    }
+  }, [auctionId, supabase, router])
 
   const pollRegistrationStatus = useCallback(async () => {
     if (!userId) return
-    const { data } = await supabase
-      .from('auction_registrations')
-      .select('approval_status')
-      .eq('auction_id', auctionId)
-      .eq('user_id', userId)
-      .single()
+    try {
+      const { data } = await supabase
+        .from('auction_registrations')
+        .select('approval_status')
+        .eq('auction_id', auctionId)
+        .eq('user_id', userId)
+        .single()
 
-    if (!data) return
+      if (!data) return
 
-    if (lastApprovalStatus.current === null) {
-      lastApprovalStatus.current = data.approval_status
-      return
-    }
-
-    if (data.approval_status !== lastApprovalStatus.current) {
-      lastApprovalStatus.current = data.approval_status
-      if (data.approval_status === 'approved') {
-        setNotification({ type: 'approved', message: 'Your registration has been approved! Refreshing...' })
+      if (lastApprovalStatus.current !== null && data.approval_status !== lastApprovalStatus.current) {
+        lastApprovalStatus.current = data.approval_status
+        if (data.approval_status === 'approved') {
+          setNotification({ type: 'approved', message: 'Your registration has been approved! Refreshing...' })
+        }
+        setTimeout(() => router.refresh(), 1000)
+      } else if (lastApprovalStatus.current === null) {
+        lastApprovalStatus.current = data.approval_status
       }
-      setTimeout(() => router.refresh(), 1500)
+    } catch {
+      // Ignore background poll errors
     }
   }, [auctionId, userId, supabase, router])
 
-  // Poll registration status as a reliable fallback for realtime
+  // Poll auction & registration status as reliable fallback for serverless environments
   useEffect(() => {
-    if (!userId) return
-    pollRegistrationStatus()
-    const interval = setInterval(pollRegistrationStatus, 5000)
+    const runPoll = () => {
+      pollAuctionStatus()
+      if (userId) pollRegistrationStatus()
+    }
+
+    runPoll()
+    const interval = setInterval(runPoll, 3000)
     return () => clearInterval(interval)
-  }, [userId, pollRegistrationStatus])
+  }, [userId, pollAuctionStatus, pollRegistrationStatus])
 
   useEffect(() => {
     const channel = supabase
