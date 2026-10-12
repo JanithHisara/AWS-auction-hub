@@ -55,12 +55,16 @@ export async function POST(request: Request) {
 
     await createSession(user.id)
 
-    sendWelcomeEmail({
-      to: user.email,
-      userName: user.displayName || user.anonymousName,
-    }).catch(err => {
-      console.warn('Could not send welcome email:', err)
-    })
+    try {
+      console.log('[Register] Sending registration confirmation email to:', user.email)
+      const emailResult = await sendWelcomeEmail({
+        to: user.email,
+        userName: user.displayName || user.anonymousName,
+      })
+      console.log('[Register] Registration confirmation email sent successfully:', emailResult)
+    } catch (err) {
+      console.error('[Register] Could not send welcome/confirm email:', err)
+    }
 
     return NextResponse.json({
       user: {

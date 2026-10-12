@@ -880,8 +880,8 @@ export async function sendWelcomeEmail({ to, userName }: WelcomeEmailParams) {
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
-                    <a href="${appUrl}" style="display: inline-block; background-color: #d4af37; color: #000000; font-size: 16px; font-weight: 700; text-decoration: none; padding: 16px 32px; border-radius: 12px;">
-                      Explore Auctions
+                    <a href="${appUrl}/login" style="display: inline-block; background-color: #d4af37; color: #000000; font-size: 16px; font-weight: 700; text-decoration: none; padding: 16px 32px; border-radius: 12px;">
+                      Log In to Your Account
                     </a>
                   </td>
                 </tr>
@@ -898,9 +898,9 @@ export async function sendWelcomeEmail({ to, userName }: WelcomeEmailParams) {
   const { data, error } = await resend.emails.send({
     from: fromEmail,
     to,
-    subject: 'Welcome to Auctionhub - Registration Confirmed',
+    subject: 'Registration Confirmed - Welcome to Auctionhub',
     html: htmlContent,
-    text: `Welcome to Auctionhub! Your registration is confirmed. Explore auctions at ${appUrl}`,
+    text: `Welcome to Auctionhub! Your registration is confirmed. Log in at ${appUrl}/login`,
   })
 
   if (error) {
