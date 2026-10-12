@@ -53,6 +53,7 @@ model Auction {
   adminId           String    @db.Uuid @map("admin_id")
   moderatorId       String?   @db.Uuid @map("moderator_id")
   name              String
+  auctionCode       String?   @map("auction_code")
   description       String?
   bannerImageUrl    String?   @map("banner_image_url")
   password          String?

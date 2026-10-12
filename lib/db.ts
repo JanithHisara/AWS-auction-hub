@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma'
 import { broadcastEvent } from '@/lib/events'
+import crypto from 'crypto'
 
 export interface QueryFilter {
   column: string
@@ -414,6 +415,9 @@ export class PostgresQueryBuilder<T = any> {
 
     const results: any[] = []
     for (const record of records) {
+      if (!record.id && record.id !== null) {
+        record.id = crypto.randomUUID()
+      }
       const keys = Object.keys(record).filter(k => record[k] !== undefined)
       const values = keys.map(k => record[k])
       const colNames = keys.map(k => `"${k}"`).join(', ')

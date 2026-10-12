@@ -140,7 +140,7 @@ export default function NewAuctionPage() {
 
       router.push(`/admin/auctions/${data.id}`)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to create auction'
+      const message = err instanceof Error ? err.message : (err as any)?.message || 'Failed to create auction'
       setError(message)
       setTimeout(() => { errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, 50)
     } finally {

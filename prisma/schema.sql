@@ -25,10 +25,11 @@ CREATE TABLE "sessions" (
 
 -- CreateTable
 CREATE TABLE "auctions" (
-    "id" UUID NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "admin_id" UUID NOT NULL,
     "moderator_id" UUID,
     "name" TEXT NOT NULL,
+    "auction_code" TEXT,
     "description" TEXT,
     "banner_image_url" TEXT,
     "password" TEXT,
