@@ -6,6 +6,7 @@ frontend:
         - npm ci --legacy-peer-deps || npm install --legacy-peer-deps
         - echo "DATABASE_URL=$DATABASE_URL" >> .env.production
         - echo "RESEND_API_KEY=$RESEND_API_KEY" >> .env.production
+        - echo "NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL" >> .env.production
         - npx prisma generate
     build:
       commands:
