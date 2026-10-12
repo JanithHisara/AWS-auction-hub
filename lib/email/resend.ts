@@ -838,6 +838,79 @@ export async function sendPasswordResetEmail({
   return data
 }
 
+export interface WelcomeEmailParams {
+  to: string
+  userName?: string | null
+}
+
+export async function sendWelcomeEmail({ to, userName }: WelcomeEmailParams) {
+  if (!resend) {
+    console.log('[Email] Welcome email would be sent to:', to)
+    return { id: 'mock-email-id' }
+  }
+
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <onboarding@resend.dev>'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://main.debwuzy1r5ca.amplifyapp.com'
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Welcome to Auctionhub</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0a0a0f; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0f; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" max-width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; background: linear-gradient(145deg, #1a1a24 0%, #12121a 100%); border-radius: 24px; border: 1px solid rgba(212, 175, 55, 0.2); overflow: hidden;">
+          <tr>
+            <td style="padding: 40px 40px 24px; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+              <h1 style="margin: 0; color: #f5f5f7; font-size: 28px; font-weight: 800;">Welcome to Auctionhub</h1>
+              <p style="margin: 8px 0 0; color: #a1a1aa; font-size: 16px;">Your premier platform for exclusive gem auctions</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 40px;">
+              <p style="margin: 0 0 16px; color: #f5f5f7; font-size: 16px;">
+                ${userName ? `Hi ${userName},` : 'Hello,'}
+              </p>
+              <p style="margin: 0 0 24px; color: #a1a1aa; font-size: 15px; line-height: 1.6;">
+                Your account registration is confirmed. You can now explore live and upcoming auctions, register for exclusive bidding rooms, and manage your collection.
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="${appUrl}" style="display: inline-block; background-color: #d4af37; color: #000000; font-size: 16px; font-weight: 700; text-decoration: none; padding: 16px 32px; border-radius: 12px;">
+                      Explore Auctions
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+
+  const { data, error } = await resend.emails.send({
+    from: fromEmail,
+    to,
+    subject: 'Welcome to Auctionhub - Registration Confirmed',
+    html: htmlContent,
+    text: `Welcome to Auctionhub! Your registration is confirmed. Explore auctions at ${appUrl}`,
+  })
+
+  if (error) {
+    console.error('Failed to send welcome email:', error)
+    throw error
+  }
+
+  return data
+}
+
 export { resend }
 
 

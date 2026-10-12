@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -52,11 +52,17 @@ export default function ResetPasswordForm() {
     setMessage(null)
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password
+      const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+      const token = searchParams?.get('token')
+
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
       })
 
-      if (error) throw error
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update password')
       
       setStatus('success')
       setMessage('Password has been updated successfully!')

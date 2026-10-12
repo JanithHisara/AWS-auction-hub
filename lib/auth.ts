@@ -254,3 +254,31 @@ export async function requireAuctionManager(
 
   redirect('/')
 }
+
+const RESET_SECRET = process.env.AUTH_SECRET || 'auction_hub_super_secret_reset_key_2026'
+
+export function generateResetToken(userId: string, email: string): string {
+  const expiresAt = Date.now() + 1000 * 60 * 60 // 1 hour
+  const payload = `${userId}:${email}:${expiresAt}`
+  const crypto = require('crypto')
+  const signature = crypto.createHmac('sha256', RESET_SECRET).update(payload).digest('hex')
+  return Buffer.from(`${payload}:${signature}`).toString('base64url')
+}
+
+export function verifyResetToken(token: string): { userId: string; email: string } | null {
+  try {
+    const decoded = Buffer.from(token, 'base64url').toString('utf8')
+    const [userId, email, expiresAtStr, signature] = decoded.split(':')
+    const expiresAt = parseInt(expiresAtStr, 10)
+    if (!expiresAt || Date.now() > expiresAt) return null
+
+    const payload = `${userId}:${email}:${expiresAtStr}`
+    const crypto = require('crypto')
+    const expectedSignature = crypto.createHmac('sha256', RESET_SECRET).update(payload).digest('hex')
+    if (signature !== expectedSignature) return null
+
+    return { userId, email }
+  } catch {
+    return null
+  }
+}

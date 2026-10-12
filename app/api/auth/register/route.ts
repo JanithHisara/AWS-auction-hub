@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { hashPassword, createSession } from '@/lib/auth'
+import { sendWelcomeEmail } from '@/lib/email/resend'
 
 export async function POST(request: Request) {
   try {
@@ -53,6 +54,13 @@ export async function POST(request: Request) {
     }).catch(() => {})
 
     await createSession(user.id)
+
+    sendWelcomeEmail({
+      to: user.email,
+      userName: user.displayName || user.anonymousName,
+    }).catch(err => {
+      console.warn('Could not send welcome email:', err)
+    })
 
     return NextResponse.json({
       user: {
