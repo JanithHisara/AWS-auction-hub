@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { verifyPassword, createSession } from '@/lib/auth'
+import { verifyPassword, createSession, SUPER_ADMIN_EMAILS } from '@/lib/auth'
 
 export async function POST(request: Request) {
   try {
@@ -36,11 +36,14 @@ export async function POST(request: Request) {
 
     await createSession(user.id)
 
+    const isSuperAdmin = user.role === 'super_admin' || SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())
+    const effectiveRole = isSuperAdmin ? 'super_admin' : user.role
+
     return NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
+        role: effectiveRole,
         anonymous_name: user.anonymousName,
         display_name: user.displayName,
         phone: user.phone,

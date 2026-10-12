@@ -7,6 +7,10 @@ import { ADMIN_ROLES, PERMISSIONS } from '@/lib/permissions'
 
 export const SESSION_COOKIE_NAME = 'auction_hub_session'
 
+export const SUPER_ADMIN_EMAILS = [
+  'hisarajanith@gmail.com',
+]
+
 export interface AuthUser {
   id: string
   email: string
@@ -89,10 +93,12 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     }
 
     const { user } = session
+    const isSuperAdminEmail = SUPER_ADMIN_EMAILS.includes(user.email?.toLowerCase())
+    const effectiveRole = (isSuperAdminEmail ? 'super_admin' : user.role) as UserRole
     return {
       id: user.id,
       email: user.email,
-      role: user.role as UserRole,
+      role: effectiveRole,
       anonymous_name: user.anonymousName || undefined,
       display_name: user.displayName,
       phone: user.phone,
@@ -181,12 +187,14 @@ export async function getUserRole(): Promise<UserRole | null> {
 export async function getUserPermissions(userId: string): Promise<string[]> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { role: true },
+    select: { email: true, role: true },
   })
 
   if (!user?.role) return []
 
-  if (user.role === 'super_admin') {
+  const isSuperAdmin = user.role === 'super_admin' || SUPER_ADMIN_EMAILS.includes(user.email?.toLowerCase())
+
+  if (isSuperAdmin) {
     const allPerms = await prisma.permission.findMany({ select: { key: true } })
     return allPerms.map(p => p.key)
   }
