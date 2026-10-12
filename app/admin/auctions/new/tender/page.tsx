@@ -278,7 +278,7 @@ export default function NewAuctionPage() {
                 </label>
                 <DateTimePicker
                   value={formData.auction_end}
-                  onChange={(val) => setFormData(prev => ({ ...prev, auction_end: val }))}
+                  onChange={(val) => setFormData(prev => ({ ...prev, auction_end: val, registration_end: val }))}
                   required
                   placeholder="Select end bidding time"
                 />

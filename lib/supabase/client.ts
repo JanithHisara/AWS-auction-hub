@@ -50,7 +50,9 @@ class ClientQueryBuilder<T = any> {
   }
 
   select(columns: string = '*', options?: any) {
-    this.action = 'SELECT'
+    if (this.action !== 'INSERT' && this.action !== 'UPDATE' && this.action !== 'DELETE' && this.action !== 'UPSERT') {
+      this.action = 'SELECT'
+    }
     this.selectClause = columns
     this.selectOptions = options
     return this

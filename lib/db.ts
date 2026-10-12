@@ -209,7 +209,9 @@ export class PostgresQueryBuilder<T = any> {
   }
 
   select(columns: string = '*', options?: any) {
-    this.action = 'SELECT'
+    if (this.action !== 'INSERT' && this.action !== 'UPDATE' && this.action !== 'DELETE' && this.action !== 'UPSERT') {
+      this.action = 'SELECT'
+    }
     this.selectClause = columns
     this.selectOptions = options
     return this
@@ -456,7 +458,7 @@ export class PostgresQueryBuilder<T = any> {
       })
     }
 
-    const data = Array.isArray(this.payload) ? results : (this.isSingle ? results[0] : results[0])
+    const data = this.isSingle ? (results[0] || null) : (Array.isArray(this.payload) ? results : (results[0] || null))
     return { data, error: null }
   }
 
