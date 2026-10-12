@@ -40,6 +40,20 @@ export function isUuid(val: any): boolean {
   return typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
 }
 
+export function isTimestamp(val: any): boolean {
+  return typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:\d{2})?)?$/i.test(val)
+}
+
+export function formatSqlPlaceholder(val: any, idx: number): string {
+  if (isUuid(val)) {
+    return `$${idx}::uuid`
+  }
+  if (isTimestamp(val)) {
+    return `$${idx}::timestamp`
+  }
+  return `$${idx}`
+}
+
 export async function executeRpc(fnName: string, args: any = {}): Promise<{ data: any; error: any }> {
   try {
     if (fnName === 'get_auction_registration_count') {
@@ -345,7 +359,7 @@ export class PostgresQueryBuilder<T = any> {
         if (inVals.length === 0) {
           conditions.push('FALSE')
         } else {
-          const placeholders = inVals.map((v, i) => isUuid(v) ? `$${currentIdx + i}::uuid` : `$${currentIdx + i}`).join(', ')
+          const placeholders = inVals.map((v, i) => formatSqlPlaceholder(v, currentIdx + i)).join(', ')
           conditions.push(`"${f.column}" IN (${placeholders})`)
           params.push(...inVals)
           currentIdx += inVals.length
@@ -355,13 +369,13 @@ export class PostgresQueryBuilder<T = any> {
         if (inVals.length === 0) {
           // NOT IN empty list is always true
         } else {
-          const placeholders = inVals.map((v, i) => isUuid(v) ? `$${currentIdx + i}::uuid` : `$${currentIdx + i}`).join(', ')
+          const placeholders = inVals.map((v, i) => formatSqlPlaceholder(v, currentIdx + i)).join(', ')
           conditions.push(`"${f.column}" NOT IN (${placeholders})`)
           params.push(...inVals)
           currentIdx += inVals.length
         }
       } else {
-        const ph = isUuid(f.value) ? `$${currentIdx}::uuid` : `$${currentIdx}`
+        const ph = formatSqlPlaceholder(f.value, currentIdx)
         conditions.push(`"${f.column}" ${f.operator} ${ph}`)
         params.push(f.value)
         currentIdx++
@@ -377,7 +391,7 @@ export class PostgresQueryBuilder<T = any> {
           const col = m[1]
           const op = m[2].toUpperCase()
           const val = m[3]
-          const ph = isUuid(val) ? `$${currentIdx}::uuid` : `$${currentIdx}`
+          const ph = formatSqlPlaceholder(val, currentIdx)
           subConditions.push(`"${col}" ${op} ${ph}`)
           params.push(val)
           currentIdx++
@@ -427,7 +441,7 @@ export class PostgresQueryBuilder<T = any> {
       const keys = Object.keys(record).filter(k => record[k] !== undefined)
       const values = keys.map(k => record[k])
       const colNames = keys.map(k => `"${k}"`).join(', ')
-      const placeholders = values.map((val, i) => isUuid(val) ? `$${i + 1}::uuid` : `$${i + 1}`).join(', ')
+      const placeholders = values.map((val, i) => formatSqlPlaceholder(val, i + 1)).join(', ')
 
       const sql = `INSERT INTO "${this.table}" (${colNames}) VALUES (${placeholders}) RETURNING *`
       const res = await prisma.$queryRawUnsafe<any[]>(sql, ...values)
@@ -456,7 +470,7 @@ export class PostgresQueryBuilder<T = any> {
 
     for (const k of keys) {
       const val = this.payload[k]
-      const ph = isUuid(val) ? `$${pIdx}::uuid` : `$${pIdx}`
+      const ph = formatSqlPlaceholder(val, pIdx)
       setClauses.push(`"${k}" = ${ph}`)
       params.push(val)
       pIdx++
@@ -505,7 +519,7 @@ export class PostgresQueryBuilder<T = any> {
     const keys = Object.keys(record).filter(k => record[k] !== undefined)
     const values = keys.map(k => record[k])
     const colNames = keys.map(k => `"${k}"`).join(', ')
-    const placeholders = values.map((val, i) => isUuid(val) ? `$${i + 1}::uuid` : `$${i + 1}`).join(', ')
+    const placeholders = values.map((val, i) => formatSqlPlaceholder(val, i + 1)).join(', ')
 
     const conflictCol = keys.includes('user_id') && this.table === 'user_rewards' ? '"user_id"' : '"id"'
     const updateSets = keys.map(k => `"${k}" = EXCLUDED."${k}"`).join(', ')
@@ -571,7 +585,7 @@ export class PostgresQueryBuilder<T = any> {
       const userIds = Array.from(new Set(rows.map(r => r.user_id || r.admin_id).filter(Boolean)))
       if (userIds.length > 0) {
         const users = await prisma.$queryRawUnsafe<any[]>(
-          `SELECT id, email, role, anonymous_name, display_name, phone FROM "users" WHERE id IN (${userIds.map((v, i) => isUuid(v) ? `$${i + 1}::uuid` : `$${i + 1}`).join(', ')})`,
+          `SELECT id, email, role, anonymous_name, display_name, phone FROM "users" WHERE id IN (${userIds.map((v, i) => formatSqlPlaceholder(v, i + 1)).join(', ')})`,
           ...userIds
         )
         const userMap = new Map(sanitizeRow(users).map((u: any) => [u.id, u]))
@@ -587,7 +601,7 @@ export class PostgresQueryBuilder<T = any> {
       const auctionIds = Array.from(new Set(rows.map(r => r.auction_id).filter(Boolean)))
       if (auctionIds.length > 0) {
         const auctions = await prisma.$queryRawUnsafe<any[]>(
-          `SELECT * FROM "auctions" WHERE id IN (${auctionIds.map((v, i) => isUuid(v) ? `$${i + 1}::uuid` : `$${i + 1}`).join(', ')})`,
+          `SELECT * FROM "auctions" WHERE id IN (${auctionIds.map((v, i) => formatSqlPlaceholder(v, i + 1)).join(', ')})`,
           ...auctionIds
         )
         const auctionMap = new Map(sanitizeRow(auctions).map((a: any) => [a.id, a]))
@@ -602,7 +616,7 @@ export class PostgresQueryBuilder<T = any> {
       const gemIds = Array.from(new Set(rows.map(r => r.gem_id).filter(Boolean)))
       if (gemIds.length > 0) {
         const gems = await prisma.$queryRawUnsafe<any[]>(
-          `SELECT * FROM "gems" WHERE id IN (${gemIds.map((v, i) => isUuid(v) ? `$${i + 1}::uuid` : `$${i + 1}`).join(', ')})`,
+          `SELECT * FROM "gems" WHERE id IN (${gemIds.map((v, i) => formatSqlPlaceholder(v, i + 1)).join(', ')})`,
           ...gemIds
         )
         const gemMap = new Map(sanitizeRow(gems).map((g: any) => [g.id, g]))
@@ -617,7 +631,7 @@ export class PostgresQueryBuilder<T = any> {
       const gemIds = rows.map(r => r.id).filter(Boolean)
       if (gemIds.length > 0) {
         const images = await prisma.$queryRawUnsafe<any[]>(
-          `SELECT * FROM "gem_images" WHERE gem_id IN (${gemIds.map((v, i) => isUuid(v) ? `$${i + 1}::uuid` : `$${i + 1}`).join(', ')}) ORDER BY display_order ASC`,
+          `SELECT * FROM "gem_images" WHERE gem_id IN (${gemIds.map((v, i) => formatSqlPlaceholder(v, i + 1)).join(', ')}) ORDER BY display_order ASC`,
           ...gemIds
         )
         const sanitizedImages = sanitizeRow(images)
@@ -633,7 +647,7 @@ export class PostgresQueryBuilder<T = any> {
       const gemIds = rows.map(r => r.id).filter(Boolean)
       if (gemIds.length > 0) {
         const certs = await prisma.$queryRawUnsafe<any[]>(
-          `SELECT * FROM "gem_certificates" WHERE gem_id IN (${gemIds.map((v, i) => isUuid(v) ? `$${i + 1}::uuid` : `$${i + 1}`).join(', ')})`,
+          `SELECT * FROM "gem_certificates" WHERE gem_id IN (${gemIds.map((v, i) => formatSqlPlaceholder(v, i + 1)).join(', ')})`,
           ...gemIds
         )
         const sanitizedCerts = sanitizeRow(certs)
