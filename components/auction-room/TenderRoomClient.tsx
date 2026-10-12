@@ -44,9 +44,9 @@ export default function TenderRoomClient({ auction, items: initialItems, user, r
     const initialBids: Record<string, number> = {}
     initialItems.forEach(item => {
       // Find the user's highest bid for this item
-      const myBids = item.bids.filter(b => b.user_id === user.id)
+      const myBids = (item.bids || []).filter(b => b.user_id === user.id)
       if (myBids.length > 0) {
-        initialBids[item.id] = Math.max(...myBids.map(b => b.bid_amount))
+        initialBids[item.id] = Math.max(...myBids.map(b => Number(b.bid_amount)))
       }
     })
     return initialBids
@@ -54,7 +54,15 @@ export default function TenderRoomClient({ auction, items: initialItems, user, r
 
   useEffect(() => {
     setItems(initialItems)
-  }, [initialItems])
+    const initialBids: Record<string, number> = {}
+    initialItems.forEach(item => {
+      const myBids = (item.bids || []).filter(b => b.user_id === user.id)
+      if (myBids.length > 0) {
+        initialBids[item.id] = Math.max(...myBids.map(b => Number(b.bid_amount)))
+      }
+    })
+    setUserBids(prev => ({ ...prev, ...initialBids }))
+  }, [initialItems, user.id])
 
   const activeItems = items.filter(item => item.status === 'active')
 

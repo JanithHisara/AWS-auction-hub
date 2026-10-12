@@ -722,6 +722,55 @@ export class PostgresQueryBuilder<T = any> {
       }
     }
 
+    // Expand bids for gems
+    if (clause.includes('bids') && this.table === 'gems') {
+      const gemIds = rows.map(r => r.id).filter(Boolean)
+      if (gemIds.length > 0) {
+        const bids = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT b.*, u.anonymous_name, u.display_name 
+           FROM "bids" b 
+           LEFT JOIN "users" u ON b.user_id = u.id 
+           WHERE b.gem_id IN (${gemIds.map((v, i) => formatSqlPlaceholder(v, i + 1, 'gem_id', 'bids')).join(', ')}) 
+           ORDER BY b.created_at ASC`,
+          ...gemIds
+        )
+        const sanitizedBids = sanitizeRow(bids)
+        for (const b of sanitizedBids) {
+          b.bid_amount = Number(b.bid_amount)
+          b.user = {
+            anonymous_name: b.anonymous_name || null,
+            display_name: b.display_name || null,
+          }
+        }
+        for (const r of rows) {
+          r.bids = sanitizedBids.filter((bid: any) => bid.gem_id === r.id)
+        }
+      } else {
+        for (const r of rows) {
+          r.bids = []
+        }
+      }
+    }
+
+    // Expand single bid join (e.g. bid:bids on payments or winning_bid:bids on auction_winners)
+    if (clause.includes('bid:bids') || clause.includes('winning_bid:bids')) {
+      const bidIds = Array.from(new Set(rows.map(r => r.bid_id || r.winning_bid_id).filter(Boolean)))
+      if (bidIds.length > 0) {
+        const bids = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT * FROM "bids" WHERE id IN (${bidIds.map((v, i) => formatSqlPlaceholder(v, i + 1, 'id', 'bids')).join(', ')})`,
+          ...bidIds
+        )
+        const bidMap = new Map(sanitizeRow(bids).map((b: any) => {
+          b.bid_amount = Number(b.bid_amount)
+          return [b.id, b]
+        }))
+        for (const r of rows) {
+          if (r.bid_id) r.bid = bidMap.get(r.bid_id) || null
+          if (r.winning_bid_id) r.winning_bid = bidMap.get(r.winning_bid_id) || null
+        }
+      }
+    }
+
     return rows
   }
 
