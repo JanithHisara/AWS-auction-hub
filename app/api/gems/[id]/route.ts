@@ -134,30 +134,38 @@ export async function PATCH(
 
     if (!existingGem) { return NextResponse.json({ error: 'Item not found' }, { status: 404 }) }
 
-    // If trying to activate, check no other item is currently active in this auction
+    // If trying to activate, check no other item is currently active in this auction (unless it's a sealed bid / tender auction where all items are active at once)
     if (body.status === 'active' && existingGem.auction_id) {
-      const { data: activeItems } = await supabase
-        .from('gems')
-        .select('id, name')
-        .eq('auction_id', existingGem.auction_id)
-        .eq('status', 'active')
-        .neq('id', id)
+      const { data: auction } = await adminDb
+        .from('auctions')
+        .select('auction_type')
+        .eq('id', existingGem.auction_id)
+        .single()
 
-      if (activeItems && activeItems.length > 0) {
-        return NextResponse.json({ 
-          error: `Cannot activate: "${activeItems[0].name}" is already active. End that item first.` 
-        }, { status: 400 })
+      if (auction && auction.auction_type !== 'tender_base_fixed_bid') {
+        const { data: activeItems } = await supabase
+          .from('gems')
+          .select('id, name')
+          .eq('auction_id', existingGem.auction_id)
+          .eq('status', 'active')
+          .neq('id', id)
+
+        if (activeItems && activeItems.length > 0) {
+          return NextResponse.json({ 
+            error: `Cannot activate: "${activeItems[0].name}" is already active. End that item first.` 
+          }, { status: 400 })
+        }
       }
     }
 
     const updates: Record<string, unknown> = {}
     if (body.status) updates.status = body.status
     
-    // Set published_at when publishing (draft/pending -> active)
-    if (body.status === 'active' && (existingGem.status === 'draft' || existingGem.status === 'pending')) {
-      if (!existingGem.status || existingGem.status === 'draft') {
-        updates.published_at = new Date().toISOString()
-      }
+    // Set published_at when publishing or activating (draft/pending -> active)
+    if (body.status === 'active') {
+      updates.published_at = existingGem.published_at || new Date().toISOString()
+    } else if (body.status === 'pending' && !existingGem.published_at) {
+      updates.published_at = new Date().toISOString()
     }
 
     const { data: gem, error } = await adminDb.from('gems').update(updates)

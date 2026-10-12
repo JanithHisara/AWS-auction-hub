@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
@@ -129,7 +132,7 @@ export default async function AdminAuctionDetailPage({ params }: { params: Promi
   const { auction, items, registrations } = data
   const totalBids = items.reduce((sum, item) => sum + item.bidsCount, 0)
   const totalValue = items.reduce((sum, item) => sum + item.highestBid, 0)
-    const unpublishedItemCount = items?.filter(item => item.status !== 'published').length || 0;
+  const unpublishedItemCount = items?.filter(item => item.status === 'draft' || !item.status).length || 0;
   const approvedCount = registrations.filter(r => r.approval_status === 'approved').length
 
   return (

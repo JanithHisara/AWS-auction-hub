@@ -271,11 +271,11 @@ export default function AdminControls({ gemId, currentPrice, minIncrement, statu
         </div>
 
         <div className="flex flex-wrap gap-3">
-          {/* ACTIVATE BUTTON - For pending items */}
-          {status === 'pending' && (
+          {/* ACTIVATE BUTTON - For pending items or draft items in sealed bid */}
+          {(status === 'pending' || (status === 'draft' && isTenderBaseFixedBid)) && (
             <button
               onClick={async () => {
-                  if (await confirm('Activate this item? It will become the current active item for bidding.')) {
+                  if (await confirm('Activate this item? It will become active for bidding.')) {
                   handleAction('activate')
                 }
               }}

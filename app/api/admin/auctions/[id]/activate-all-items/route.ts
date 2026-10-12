@@ -1,5 +1,5 @@
-﻿import { NextResponse } from 'next/server'
-import { requirePermission } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { requireAuctionManager } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { PERMISSIONS } from '@/lib/permissions'
 
@@ -8,17 +8,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requirePermission(PERMISSIONS.MANAGE_DEVICES)
-    
     const { id } = await params
+    await requireAuctionManager(id, undefined, PERMISSIONS.MANAGE_ITEMS)
+    
     const adminDb = createAdminClient()
 
     // Update all non-completed/non-ended gems in this auction to 'active'
     const { error } = await adminDb
       .from('gems')
-      .update({ status: 'active' })
+      .update({ status: 'active', published_at: new Date().toISOString() })
       .eq('auction_id', id)
-      .not('status', 'in', '("ended","completed")')
+      .not('status', 'in', ['ended', 'completed'])
 
     if (error) {
       console.error('Failed to activate all items:', error)
