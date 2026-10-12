@@ -4,6 +4,8 @@ import { Auction } from '@/types/database'
 import Logo from '@/components/brand/Logo'
 import LocalTime from '@/components/ui/LocalTime'
 
+export const dynamic = 'force-dynamic'
+
 async function getUpcomingAuctions() {
   const supabase = await createClient()
   

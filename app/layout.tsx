@@ -22,6 +22,8 @@ export const metadata: Metadata = {
   description: "Premium auctions for collectors",
 };
 
+export const dynamic = 'force-dynamic'
+
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider"
 
 export default async function RootLayout({

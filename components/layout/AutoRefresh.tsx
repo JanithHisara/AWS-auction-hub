@@ -16,7 +16,7 @@ export default function AutoRefresh() {
 
     const isAuctionRoom = pathname?.includes('/auction-room/')
 
-    let channel = null
+    let channel: any = null
     
     // Only subscribe to Postgres changes globally if we are NOT in the auction room.
     // The auction room handles real-time WebSockets instantly via its own local state.

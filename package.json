@@ -12,19 +12,24 @@
         "cdk:synth": "cd cdk && npx cdk synth --profile gem-auction",
         "cdk:diff": "cd cdk && npx cdk diff --profile gem-auction",
         "cdk:deploy": "cd cdk && npx cdk deploy --profile gem-auction --require-approval never",
-        "cdk:destroy": "cd cdk && npx cdk destroy --profile gem-auction"
+        "cdk:destroy": "cd cdk && npx cdk destroy --profile gem-auction",
+        "postinstall": "prisma skills sync || exit 0"
     },
     "dependencies": {
         "@aws-sdk/client-iot-data-plane": "^3.400.0",
         "@aws-sdk/client-s3": "^3.1148.0",
+        "@prisma/client": "^5.22.0",
         "@supabase/ssr": "^0.7.0",
         "@supabase/supabase-js": "^2.80.0",
+        "@types/bcryptjs": "^2.4.6",
+        "bcryptjs": "^3.0.3",
         "clsx": "^2.1.1",
         "date-fns": "^4.1.0",
         "decimal.js": "^10.6.0",
         "dotenv": "^17.4.2",
         "lucide-react": "^0.555.0",
         "next": "^16.4.0",
+        "pg": "^8.23.1",
         "react": "19.2.0",
         "react-dom": "19.2.0",
         "resend": "^6.32.1",
@@ -39,6 +44,7 @@
         "baseline-browser-mapping": "^2.11.20",
         "eslint": "^9",
         "eslint-config-next": "^14.2.35",
+        "prisma": "^5.22.0",
         "tailwindcss": "^4",
         "typescript": "^5"
     },

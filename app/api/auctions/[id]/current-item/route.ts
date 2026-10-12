@@ -58,7 +58,7 @@ export async function GET(
       : null
 
     // Get bid data for current item
-    let bidData = null
+    let bidData: any = null
     if (currentItem) {
       const { count: bidCount } = await supabase
         .from('bids')

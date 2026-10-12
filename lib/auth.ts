@@ -1,16 +1,116 @@
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import bcrypt from 'bcryptjs'
+import prisma from '@/lib/prisma'
 import type { UserRole } from '@/types/database'
 import { ADMIN_ROLES, PERMISSIONS } from '@/lib/permissions'
 
-export async function getCurrentUser() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
+export const SESSION_COOKIE_NAME = 'auction_hub_session'
+
+export interface AuthUser {
+  id: string
+  email: string
+  role: UserRole
+  anonymous_name?: string
+  display_name?: string | null
+  phone?: string | null
+  user_metadata?: {
+    display_name?: string | null
+    phone?: string | null
+  }
 }
 
-export async function requireAuth() {
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10)
+}
+
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash)
+}
+
+export async function createSession(userId: string): Promise<string> {
+  const token = crypto.randomUUID()
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
+  await prisma.session.create({
+    data: {
+      id: token,
+      userId,
+      expiresAt,
+    },
+  })
+
+  const cookieStore = await cookies()
+  cookieStore.set(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    expires: expiresAt,
+    path: '/',
+  })
+
+  return token
+}
+
+export async function deleteSession(): Promise<void> {
+  const cookieStore = await cookies()
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value
+
+  if (token) {
+    try {
+      await prisma.session.delete({
+        where: { id: token },
+      })
+    } catch {
+      // Ignore if session not in DB
+    }
+  }
+
+  cookieStore.delete(SESSION_COOKIE_NAME)
+}
+
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  try {
+    const cookieStore = await cookies()
+    const token = cookieStore.get(SESSION_COOKIE_NAME)?.value
+
+    if (!token) return null
+
+    const session = await prisma.session.findUnique({
+      where: { id: token },
+      include: { user: true },
+    })
+
+    if (!session || session.expiresAt < new Date()) {
+      if (session) {
+        await prisma.session.delete({ where: { id: token } }).catch(() => {})
+      }
+      return null
+    }
+
+    const { user } = session
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role as UserRole,
+      anonymous_name: user.anonymousName || undefined,
+      display_name: user.displayName,
+      phone: user.phone,
+      user_metadata: {
+        display_name: user.displayName,
+        phone: user.phone,
+      },
+    }
+  } catch (error: any) {
+    if (error?.digest === 'DYNAMIC_SERVER_USAGE' || error?.message?.includes('Dynamic server usage')) {
+      throw error
+    }
+    console.error('Error fetching current user:', error)
+    return null
+  }
+}
+
+export async function requireAuth(): Promise<AuthUser> {
   const user = await getCurrentUser()
   if (!user) {
     redirect('/login')
@@ -18,77 +118,52 @@ export async function requireAuth() {
   return user
 }
 
-export async function requireAdmin() {
+export async function requireAdmin(): Promise<AuthUser> {
   const user = await requireAuth()
-  const supabase = await createClient()
   
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const role = userData?.role as UserRole | undefined
-  if (!role || !ADMIN_ROLES.includes(role as typeof ADMIN_ROLES[number])) {
+  if (!user.role || !ADMIN_ROLES.includes(user.role as typeof ADMIN_ROLES[number])) {
     redirect('/')
   }
 
   return user
 }
 
-export async function requireSuperAdmin() {
+export async function requireSuperAdmin(): Promise<AuthUser> {
   const user = await requireAuth()
-  const supabase = await createClient()
-  
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
 
-  if (userData?.role !== 'super_admin') {
+  if (user.role !== 'super_admin') {
     redirect('/')
   }
 
   return user
 }
 
-export async function requirePermission(permissionKey: string) {
+export async function requirePermission(permissionKey: string): Promise<AuthUser> {
   const user = await requireAuth()
-  const supabase = await createClient()
-  
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
 
-  if (!userData?.role) {
+  if (!user.role) {
     redirect('/')
   }
 
-  if (userData.role === 'super_admin') {
+  if (user.role === 'super_admin') {
     return user
   }
 
-  if (userData.role === 'admin') {
+  if (user.role === 'admin') {
     if (permissionKey === 'manage_permissions') redirect('/')
     return user
   }
 
-  if (!ADMIN_ROLES.includes(userData.role as typeof ADMIN_ROLES[number])) {
+  if (!ADMIN_ROLES.includes(user.role as typeof ADMIN_ROLES[number])) {
     redirect('/')
   }
 
-  const { data: permissions } = await supabase
-    .from('role_permissions')
-    .select('permission_id, permissions!inner(key)')
-    .eq('role', userData.role)
+  const rolePerms = await prisma.rolePermission.findMany({
+    where: { role: user.role },
+    include: { permission: true },
+  })
 
-  const permissionKeys = (permissions || []).map((rp: Record<string, unknown>) => {
-    const p = rp.permissions as { key: string } | { key: string }[]
-    return Array.isArray(p) ? p[0]?.key : p?.key
-  }).filter(Boolean) as string[]
+  const permissionKeys = rolePerms.map(rp => rp.permission?.key).filter(Boolean) as string[]
 
   if (!permissionKeys.includes(permissionKey)) {
     redirect('/')
@@ -100,99 +175,71 @@ export async function requirePermission(permissionKey: string) {
 export async function getUserRole(): Promise<UserRole | null> {
   const user = await getCurrentUser()
   if (!user) return null
-
-  const supabase = await createClient()
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  return (userData?.role as UserRole) || null
+  return user.role || null
 }
 
 export async function getUserPermissions(userId: string): Promise<string[]> {
-  const supabase = await createClient()
-  
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', userId)
-    .single()
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  })
 
-  if (!userData?.role) return []
+  if (!user?.role) return []
 
-  if (userData.role === 'super_admin') {
-    const { data: allPerms } = await supabase
-      .from('permissions')
-      .select('key')
-    return allPerms?.map((p: { key: string }) => p.key) || []
+  if (user.role === 'super_admin') {
+    const allPerms = await prisma.permission.findMany({ select: { key: true } })
+    return allPerms.map(p => p.key)
   }
 
-  if (userData.role === 'admin') {
-    const { data: allPerms } = await supabase
-      .from('permissions')
-      .select('key')
-    return (allPerms || []).map((p: { key: string }) => p.key).filter(k => k !== 'manage_permissions')
+  if (user.role === 'admin') {
+    const allPerms = await prisma.permission.findMany({ select: { key: true } })
+    return allPerms.map(p => p.key).filter(k => k !== 'manage_permissions')
   }
 
-  const { data: rolePerms } = await supabase
-    .from('role_permissions')
-    .select('permissions!inner(key)')
-    .eq('role', userData.role)
+  const rolePerms = await prisma.rolePermission.findMany({
+    where: { role: user.role },
+    include: { permission: true },
+  })
 
-  return (rolePerms || []).map((rp: Record<string, unknown>) => {
-    const p = rp.permissions as { key: string } | { key: string }[]
-    return Array.isArray(p) ? p[0]?.key : p?.key
-  }).filter(Boolean) as string[]
+  return rolePerms.map(rp => rp.permission?.key).filter(Boolean) as string[]
 }
 
 export async function checkPermission(permissionKey: string): Promise<boolean> {
   const user = await getCurrentUser()
   if (!user) return false
 
-  const supabase = await createClient()
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  if (user.role === 'super_admin') return true
+  if (!ADMIN_ROLES.includes(user.role as typeof ADMIN_ROLES[number])) return false
 
-  if (!userData?.role) return false
-  if (userData.role === 'super_admin') return true
-  if (!ADMIN_ROLES.includes(userData.role as typeof ADMIN_ROLES[number])) return false
-
-  const { data: permissions } = await supabase
-    .from('role_permissions')
-    .select('permission_id, permissions!inner(key)')
-    .eq('role', userData.role)
-
-  const keys = (permissions || []).map((rp: Record<string, unknown>) => {
-    const p = rp.permissions as { key: string } | { key: string }[]
-    return Array.isArray(p) ? p[0]?.key : p?.key
-  }).filter(Boolean) as string[]
-
-  return keys.includes(permissionKey)
+  const permissions = await getUserPermissions(user.id)
+  return permissions.includes(permissionKey)
 }
 
-
-export async function requireAuctionManager(auctionId?: string, gemId?: string, requiredGlobalPermission: string = PERMISSIONS.CONTROL_BIDDING) {
+export async function requireAuctionManager(
+  auctionId?: string,
+  gemId?: string,
+  requiredGlobalPermission: string = PERMISSIONS.CONTROL_BIDDING
+): Promise<AuthUser> {
   const user = await requireAuth()
-  const supabase = await createClient()
-  const adminDb = createAdminClient()
 
   const hasGlobal = await checkPermission(requiredGlobalPermission)
   if (hasGlobal) return user
 
   let targetAuctionId = auctionId
   if (gemId && !targetAuctionId) {
-    const { data: gem } = await adminDb.from('gems').select('auction_id').eq('id', gemId).single()
-    if (gem?.auction_id) targetAuctionId = gem.auction_id
+    const gem = await prisma.gem.findUnique({
+      where: { id: gemId },
+      select: { auctionId: true },
+    })
+    if (gem?.auctionId) targetAuctionId = gem.auctionId
   }
 
   if (targetAuctionId) {
-    const { data: auction } = await adminDb.from('auctions').select('moderator_id').eq('id', targetAuctionId).single()
-    if (auction?.moderator_id === user.id) {
+    const auction = await prisma.auction.findUnique({
+      where: { id: targetAuctionId },
+      select: { moderatorId: true },
+    })
+    if (auction?.moderatorId === user.id) {
       return user
     }
   }
