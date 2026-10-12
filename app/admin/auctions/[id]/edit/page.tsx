@@ -70,6 +70,7 @@ export default function EditAuctionPage() {
         const res = await fetch(`/api/admin/auctions/${id}`)
         if (!res.ok) throw new Error('Failed to fetch auction')
         const auction = await res.json()
+        const tenderEndTime = auction.auction_end || auction.registration_end
 
         setFormData({
           name: auction.name || '',
@@ -78,18 +79,18 @@ export default function EditAuctionPage() {
           password: auction.password || '',
           auction_type: auction.auction_type || 'tender_base_fixed_bid',
           registration_start: toLocalDatetime(auction.registration_start),
-          registration_end: toLocalDatetime(auction.registration_end),
+          registration_end: toLocalDatetime(auction.auction_type === 'tender_base_fixed_bid' ? tenderEndTime : auction.registration_end),
           auction_start: toLocalDatetime(auction.auction_start),
-          auction_end: toLocalDatetime(auction.auction_end),
+          auction_end: toLocalDatetime(auction.auction_type === 'tender_base_fixed_bid' ? tenderEndTime : auction.auction_end),
           max_participants: auction.max_participants?.toString() || '',
           entry_fee: auction.entry_fee?.toString() || '0',
-      moderator_id: auction.moderator_id || '',
+          moderator_id: auction.moderator_id || '',
         })
         setOriginalData({
           registration_start: auction.registration_start || '',
-          registration_end: auction.registration_end || '',
+          registration_end: (auction.auction_type === 'tender_base_fixed_bid' ? tenderEndTime : auction.registration_end) || '',
           auction_start: auction.auction_start || '',
-          auction_end: auction.auction_end || '',
+          auction_end: (auction.auction_type === 'tender_base_fixed_bid' ? tenderEndTime : auction.auction_end) || '',
         })
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Failed to load auction'
@@ -119,65 +120,79 @@ export default function EditAuctionPage() {
       const regStart = new Date(formData.registration_start)
       const regEnd = new Date(formData.registration_end)
       const aucStart = new Date(formData.auction_start)
-      const aucEnd = new Date(formData.auction_end)
+      const aucEnd = new Date(formData.auction_type === 'tender_base_fixed_bid' ? (formData.auction_end || formData.registration_end) : formData.auction_end)
 
       const now = new Date()
-              const checkFuture = (val: string, origVal: string | undefined, label: string) => {
-          if (!val) return
-          const dateVal = new Date(val)
-          
-          if (origVal && val === toLocalDatetime(origVal)) {
+      const checkFuture = (val: string, origVal: string | undefined, label: string) => {
+        if (!val) return
+        const dateVal = new Date(val)
+        
+        if (origVal) {
+          const origDate = new Date(origVal)
+          if (Math.abs(dateVal.getTime() - origDate.getTime()) < 60000 || val === toLocalDatetime(origVal)) {
             return
           }
-          
-          if (dateVal < now) {
-            throw new Error(`${label} must be in the future`)
-          }
         }
+        
+        if (dateVal < now) {
+          throw new Error(`${label} must be in the future`)
+        }
+      }
 
       if (originalData) {
         checkFuture(formData.registration_start, originalData.registration_start, 'Registration start time')
-        checkFuture(formData.registration_end, originalData.registration_end, 'Registration end time')
-        checkFuture(formData.auction_start, originalData.auction_start, 'Auction start time')
-    
+        if (formData.auction_type === 'tender_base_fixed_bid') {
+          checkFuture(formData.auction_end || formData.registration_end, originalData.auction_end || originalData.registration_end, 'End bidding time')
+          checkFuture(formData.auction_start, originalData.auction_start, 'Bid start time')
+        } else {
+          checkFuture(formData.registration_end, originalData.registration_end, 'Registration end time')
+          checkFuture(formData.auction_start, originalData.auction_start, 'Auction start time')
+        }
       }
 
-              if (formData.auction_type === 'tender_base_fixed_bid') {
-          if (aucStart <= regStart) {
-            throw new Error('Bid start time must be after registration opens')
-          }
-          if (aucEnd <= aucStart) {
-            throw new Error('End bidding time must be after bid start time')
-          }
-        } else {
-          if (regEnd <= regStart) {
-            throw new Error('Registration end time must be after registration start time')
-          }
-          if (aucStart <= regEnd) {
-            throw new Error('Auction start time must be after registration end time')
-          }
+      if (formData.auction_type === 'tender_base_fixed_bid') {
+        if (aucStart <= regStart) {
+          throw new Error('Bid start time must be after registration opens')
         }
+        if (aucEnd <= aucStart) {
+          throw new Error('End bidding time must be after bid start time')
+        }
+      } else {
+        if (regEnd <= regStart) {
+          throw new Error('Registration end time must be after registration start time')
+        }
+        if (aucStart <= regEnd) {
+          throw new Error('Auction start time must be after registration end time')
+        }
+      }
 
-        const res = await fetch(`/api/admin/auctions/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...formData,
-            published_at: null, // Removed from edit form
-            registration_start: toUTCISO(formData.registration_start),
-            registration_end: formData.auction_type === 'tender_base_fixed_bid' ? toUTCISO(formData.auction_end) : toUTCISO(formData.registration_end),
-            auction_start: toUTCISO(formData.auction_start),
-            auction_end: formData.auction_type === 'tender_base_fixed_bid' ? toUTCISO(formData.auction_end) : new Date('2099-12-31T23:59:59Z').toISOString(),
-          }),
-        })
+      const finalRegEnd = formData.auction_type === 'tender_base_fixed_bid'
+        ? toUTCISO(formData.auction_end || formData.registration_end)
+        : toUTCISO(formData.registration_end)
+
+      const finalAucEnd = formData.auction_type === 'tender_base_fixed_bid'
+        ? toUTCISO(formData.auction_end || formData.registration_end)
+        : new Date('2099-12-31T23:59:59Z').toISOString()
+
+      const res = await fetch(`/api/admin/auctions/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          registration_start: toUTCISO(formData.registration_start),
+          registration_end: finalRegEnd,
+          auction_start: toUTCISO(formData.auction_start),
+          auction_end: finalAucEnd,
+        }),
+      })
 
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || 'Failed to update auction')
       }
 
-      router.push(`/admin/auctions/${id}`)
       router.refresh()
+      window.location.href = `/admin/auctions/${id}`
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to update auction'
       setError(message)
@@ -330,8 +345,8 @@ export default function EditAuctionPage() {
                       End Bidding Time *
                     </label>
                     <DateTimePicker
-                      value={formData.registration_end} // using registration_end here but we will also set auction_end
-                      onChange={(val) => setFormData(prev => ({ ...prev, registration_end: val }))}
+                      value={formData.auction_end || formData.registration_end}
+                      onChange={(val) => setFormData(prev => ({ ...prev, registration_end: val, auction_end: val }))}
                       required
                       placeholder="Select end bidding time"
                     />
