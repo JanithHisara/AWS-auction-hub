@@ -39,7 +39,7 @@ export async function sendAuctionAccessEmail({
     return { id: 'mock-email-id' }
   }
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <onboarding@resend.dev>'
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <noreply@iassist.lk>'
   const replyTo = process.env.RESEND_REPLY_TO
 
   const { data, error } = await resend.emails.send({
@@ -251,7 +251,7 @@ export async function sendWinnerEmail({
     return { id: 'mock-email-id' }
   }
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <onboarding@resend.dev>'
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <noreply@iassist.lk>'
   const replyTo = process.env.RESEND_REPLY_TO
 
   const { data, error } = await resend.emails.send({
@@ -506,7 +506,7 @@ export async function sendAuctionLiveEmail({
   }
 
   const { data, error } = await resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL || 'Auctionhub <onboarding@resend.dev>',
+    from: process.env.RESEND_FROM_EMAIL || 'Auctionhub <noreply@iassist.lk>',
     to,
     subject: `${auctionName} is now LIVE - Join Now`,
     html: `
@@ -617,7 +617,7 @@ export async function sendAuctionSummaryEmail({
     return { id: 'mock-email-id' }
   }
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <onboarding@resend.dev>'
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <noreply@iassist.lk>'
   const replyTo = process.env.RESEND_REPLY_TO
 
   const { data, error } = await resend.emails.send({
@@ -770,7 +770,7 @@ export async function sendPasswordResetEmail({
     return { id: 'mock-email-id' }
   }
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <onboarding@resend.dev>'
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <noreply@iassist.lk>'
   
   const htmlContent = `<!DOCTYPE html>
 <html>
@@ -849,7 +849,7 @@ export async function sendWelcomeEmail({ to, userName }: WelcomeEmailParams) {
     return { id: 'mock-email-id' }
   }
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <onboarding@resend.dev>'
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <noreply@iassist.lk>'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://main.debwuzy1r5ca.amplifyapp.com'
 
   const htmlContent = `<!DOCTYPE html>
