@@ -7,6 +7,7 @@ CREATE TABLE "users" (
     "anonymous_name" TEXT,
     "display_name" TEXT,
     "phone" TEXT,
+    "email_verified" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")

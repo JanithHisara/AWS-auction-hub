@@ -282,3 +282,30 @@ export function verifyResetToken(token: string): { userId: string; email: string
     return null
   }
 }
+
+export function generateConfirmationToken(userId: string, email: string): string {
+  const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 7 // 7 days
+  const payload = `${userId}:${email.toLowerCase()}:${expiresAt}:confirm`
+  const crypto = require('crypto')
+  const signature = crypto.createHmac('sha256', RESET_SECRET).update(payload).digest('hex')
+  return Buffer.from(`${payload}:${signature}`).toString('base64url')
+}
+
+export function verifyConfirmationToken(token: string): { userId: string; email: string } | null {
+  try {
+    const decoded = Buffer.from(token, 'base64url').toString('utf8')
+    const [userId, email, expiresAtStr, type, signature] = decoded.split(':')
+    if (type !== 'confirm') return null
+    const expiresAt = parseInt(expiresAtStr, 10)
+    if (!expiresAt || Date.now() > expiresAt) return null
+
+    const payload = `${userId}:${email}:${expiresAtStr}:confirm`
+    const crypto = require('crypto')
+    const expectedSignature = crypto.createHmac('sha256', RESET_SECRET).update(payload).digest('hex')
+    if (signature !== expectedSignature) return null
+
+    return { userId, email }
+  } catch {
+    return null
+  }
+}

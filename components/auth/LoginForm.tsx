@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Lock, Mail, ArrowRight, Loader2 } from 'lucide-react'
+import { Lock, Mail, ArrowRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import Logo from '@/components/brand/Logo'
 
 export default function LoginForm() {
@@ -17,6 +17,9 @@ export default function LoginForm() {
   const supabase = createClient()
   
   const redirectUrl = searchParams.get('redirect')
+  const isConfirmed = searchParams.get('confirmed') === 'true'
+  const isRegistered = searchParams.get('registered') === 'true'
+  const urlError = searchParams.get('error')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,10 +80,24 @@ export default function LoginForm() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <fieldset disabled={loading} className="border-0 p-0 m-0 min-w-0 space-y-5">
-            {error && (
+            {isConfirmed && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-sm flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>Email confirmed successfully! You can now sign in.</span>
+              </div>
+            )}
+
+            {isRegistered && !isConfirmed && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-sm flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>Please check your email and click the confirmation link before signing in.</span>
+              </div>
+            )}
+
+            {(error || urlError) && (
               <div className="error-message flex items-center gap-2 text-sm">
                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                {error}
+                {error || urlError}
               </div>
             )}
 

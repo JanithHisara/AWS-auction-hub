@@ -911,6 +911,93 @@ export async function sendWelcomeEmail({ to, userName }: WelcomeEmailParams) {
   return data
 }
 
+export interface ConfirmationEmailParams {
+  to: string
+  userName?: string | null
+  confirmLink: string
+}
+
+export async function sendConfirmationEmail({ to, userName, confirmLink }: ConfirmationEmailParams) {
+  if (!resend) {
+    console.log('[Email] Confirmation email would be sent to:', to)
+    console.log('[Email] Confirm link:', confirmLink)
+    return { id: 'mock-email-id' }
+  }
+
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Auctionhub <noreply@iassist.lk>'
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm Your Email</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0a0a0f; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0f; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" max-width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; background: linear-gradient(145deg, #1a1a24 0%, #12121a 100%); border-radius: 24px; border: 1px solid rgba(212, 175, 55, 0.2); overflow: hidden;">
+          <tr>
+            <td style="padding: 40px 40px 24px; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(160, 130, 61, 0.05) 100%);">
+              <h1 style="margin: 0; color: #f5f5f7; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Confirm Your Email</h1>
+              <p style="margin: 8px 0 0; color: #a1a1aa; font-size: 16px;">Activate your Auctionhub account</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 40px;">
+              <p style="margin: 0 0 16px; color: #f5f5f7; font-size: 16px;">
+                ${userName ? `Hi ${userName},` : 'Hello,'}
+              </p>
+              <p style="margin: 0 0 24px; color: #a1a1aa; font-size: 15px; line-height: 1.6;">
+                Thank you for registering on Auctionhub. Please click the button below to confirm your email address and activate your account. You will not be able to log in until your email is confirmed.
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="${confirmLink}" style="display: inline-block; background-color: #d4af37; color: #000000; font-size: 16px; font-weight: 700; text-decoration: none; padding: 16px 36px; border-radius: 12px; box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);">
+                      Confirm Email Address
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin: 28px 0 0; color: #71717a; font-size: 13px; text-align: center;">
+                If you did not create an account on Auctionhub, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 40px; text-align: center; background: rgba(255, 255, 255, 0.02); border-top: 1px solid rgba(255, 255, 255, 0.08);">
+              <p style="margin: 0; color: #71717a; font-size: 13px;">Auctionhub - Premium Gem Auctions</p>
+              <p style="margin: 8px 0 0; color: #52525b; font-size: 12px; word-break: break-all;">
+                Or copy and paste this link in your browser:<br>
+                <a href="${confirmLink}" style="color: #d4af37;">${confirmLink}</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+
+  const { data, error } = await resend.emails.send({
+    from: fromEmail,
+    to,
+    subject: 'Confirm Your Email - Auctionhub',
+    html: htmlContent,
+    text: `Confirm your Auctionhub email by visiting: ${confirmLink}`,
+  })
+
+  if (error) {
+    console.error('Failed to send confirmation email:', error)
+    throw error
+  }
+
+  return data
+}
+
 export { resend }
 
 

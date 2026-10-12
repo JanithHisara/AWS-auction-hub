@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { hashPassword, createSession } from '@/lib/auth'
-import { sendWelcomeEmail } from '@/lib/email/resend'
+import { hashPassword, generateConfirmationToken } from '@/lib/auth'
+import { sendConfirmationEmail } from '@/lib/email/resend'
 
 export async function POST(request: Request) {
   try {
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
         anonymousName: anonName,
         displayName,
         phone,
+        emailVerified: false,
       },
     })
 
@@ -53,17 +54,21 @@ export async function POST(request: Request) {
       },
     }).catch(() => {})
 
-    await createSession(user.id)
+    const token = generateConfirmationToken(user.id, user.email)
+    const requestUrl = new URL(request.url)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || requestUrl.origin
+    const confirmLink = `${appUrl}/api/auth/confirm-email?token=${token}`
 
     try {
-      console.log('[Register] Sending registration confirmation email to:', user.email)
-      const emailResult = await sendWelcomeEmail({
+      console.log('[Register] Sending confirmation email to:', user.email)
+      const emailResult = await sendConfirmationEmail({
         to: user.email,
         userName: user.displayName || user.anonymousName,
+        confirmLink,
       })
-      console.log('[Register] Registration confirmation email sent successfully:', emailResult)
+      console.log('[Register] Confirmation email sent successfully:', emailResult)
     } catch (err) {
-      console.error('[Register] Could not send welcome/confirm email:', err)
+      console.error('[Register] Could not send confirmation email:', err)
     }
 
     return NextResponse.json({
@@ -74,7 +79,10 @@ export async function POST(request: Request) {
         anonymous_name: user.anonymousName,
         display_name: user.displayName,
         phone: user.phone,
+        email_verified: false,
       },
+      message: 'Registration successful. Please check your email to confirm your account.',
+      requiresConfirmation: true,
     }, { status: 201 })
   } catch (error: any) {
     console.error('Registration error:', error)

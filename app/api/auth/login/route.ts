@@ -34,9 +34,17 @@ export async function POST(request: Request) {
       })
     }
 
+    const isSuperAdmin = user.role === 'super_admin' || SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())
+
+    if (!isSuperAdmin && !user.emailVerified) {
+      return NextResponse.json(
+        { error: 'Please confirm your email address before logging in. Check your inbox for the confirmation link.' },
+        { status: 403 }
+      )
+    }
+
     await createSession(user.id)
 
-    const isSuperAdmin = user.role === 'super_admin' || SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())
     const effectiveRole = isSuperAdmin ? 'super_admin' : user.role
 
     return NextResponse.json({
