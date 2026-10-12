@@ -32,7 +32,7 @@ export async function GET(request: Request) {
       data: { emailVerified: true },
     })
 
-    return NextResponse.redirect(`${appUrl}/login?confirmed=true`)
+    return NextResponse.redirect(`${appUrl}/auth/confirmed`)
   } catch (error: any) {
     console.error('Email confirmation error:', error)
     const { origin } = new URL(request.url)
