@@ -1,62 +1,117 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 
-export default function AutoRefresh() {
+interface Props {
+  userId?: string
+}
+
+export default function AutoRefresh({ userId }: Props) {
   const router = useRouter()
   const pathname = usePathname()
-  const supabase = createClient()
+  const lastFingerprint = useRef<string | null>(null)
+  const isSyncing = useRef(false)
+  const pendingRefresh = useRef(false)
 
+  const isAuctionRoom = pathname?.includes('/auction-room/')
+
+  const doRefresh = useCallback(() => {
+    // Avoid refreshing if inside auction-room to protect real-time bidding inputs
+    if (isAuctionRoom) return
+
+    // If user is currently typing in an input field, delay refresh so cursor/typing isn't lost
+    const activeEl = document.activeElement
+    const isTyping =
+      activeEl &&
+      (activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        (activeEl as HTMLElement).isContentEditable)
+
+    if (isTyping) {
+      pendingRefresh.current = true
+      return
+    }
+
+    pendingRefresh.current = false
+    router.refresh()
+  }, [isAuctionRoom, router])
+
+  const checkSync = useCallback(async () => {
+    if (isSyncing.current || isAuctionRoom) return
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+
+    isSyncing.current = true
+    try {
+      const url = `/api/sync${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'Cache-Control': 'no-cache' },
+      })
+
+      if (!res.ok) return
+      const data = await res.json()
+
+      if (!data.ok || !data.fingerprint) return
+
+      if (lastFingerprint.current === null) {
+        lastFingerprint.current = data.fingerprint
+        return
+      }
+
+      if (data.fingerprint !== lastFingerprint.current) {
+        lastFingerprint.current = data.fingerprint
+        doRefresh()
+      }
+    } catch {
+      // Silently ignore transient network errors
+    } finally {
+      isSyncing.current = false
+    }
+  }, [userId, isAuctionRoom, doRefresh])
+
+  // Periodic polling every 3.5 seconds
   useEffect(() => {
-    const triggerRefresh = () => {
-      router.refresh()
-    }
+    if (isAuctionRoom) return
 
-    const isAuctionRoom = pathname?.includes('/auction-room/')
+    // Run initial sync check
+    checkSync()
 
-    let channel: any = null
-    
-    // Only subscribe to Postgres changes globally if we are NOT in the auction room.
-    // The auction room handles real-time WebSockets instantly via its own local state.
-    // Running router.refresh() on every WebSocket event in the auction room causes race conditions.
-    if (!isAuctionRoom) {
-      channel = supabase
-        .channel('global-admin-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'gems' }, triggerRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'auctions' }, triggerRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'auction_registrations' }, triggerRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'bids' }, triggerRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'bidder_holds' }, triggerRefresh)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'gem_eliminations' }, triggerRefresh)
-        .subscribe()
-    }
+    const interval = setInterval(checkSync, 3500)
+    return () => clearInterval(interval)
+  }, [checkSync, isAuctionRoom])
 
-    // ALWAYS refresh immediately when the user returns to the tab (even in the auction room).
-    // This fixes the issue where users miss WebSocket events while their computer is asleep or tab is hidden.
-    const handleVisibilityChange = () => {
+  // Sync immediately when user switches tabs or window regains focus
+  useEffect(() => {
+    if (isAuctionRoom) return
+
+    const handleFocusOrVisible = () => {
       if (document.visibilityState === 'visible') {
-        triggerRefresh()
+        checkSync()
       }
     }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
 
-    // Slow fallback polling (every 30 seconds) just in case realtime connection drops/fails.
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        triggerRefresh()
+    const handleBlurInput = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null
+      if (
+        pendingRefresh.current &&
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+      ) {
+        setTimeout(doRefresh, 200)
       }
-    }, 30000)
+    }
+
+    window.addEventListener('focus', handleFocusOrVisible)
+    document.addEventListener('visibilitychange', handleFocusOrVisible)
+    document.addEventListener('focusout', handleBlurInput)
 
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel)
-      }
-      clearInterval(interval)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocusOrVisible)
+      document.removeEventListener('visibilitychange', handleFocusOrVisible)
+      document.removeEventListener('focusout', handleBlurInput)
     }
-  }, [router, supabase, pathname])
+  }, [checkSync, doRefresh, isAuctionRoom])
 
   return null
 }

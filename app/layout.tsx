@@ -41,7 +41,7 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[var(--background)] text-[var(--foreground)]`}
       >
         <ConfirmProvider>
-          <AutoRefresh />
+          <AutoRefresh userId={user?.id} />
           <GlobalChatNotifier userId={user?.id} role={role} />
         <Navbar user={user} role={role} />
         {children}
