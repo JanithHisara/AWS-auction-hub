@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+﻿export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { createClient } from '@/lib/supabase/server'
@@ -69,7 +69,7 @@ export default async function GemDetailPage({ params }: { params: Promise<{ id: 
   
   let eligibleBiddersCount = registeredBiddersCount || 0
   
-  if (isIncrementalApproval) {
+  if (isIncrementalApproval || (gem.auction as any)?.auction_type === 'progressive_elimination_auction') {
     const { count: eliminatedCount } = await supabase
       .from('gem_eliminations')
       .select('*', { count: 'exact', head: true })
@@ -149,6 +149,7 @@ export default async function GemDetailPage({ params }: { params: Promise<{ id: 
         startingPrice={gem.starting_price}
         auctionStatus={(gem.auction as any)?.status}
         eligibleBiddersCount={eligibleBiddersCount}
+        activeBiddersCount={activeBiddersCount}
       />
 
       {/* Main Content Grid */}

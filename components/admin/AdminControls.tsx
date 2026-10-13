@@ -1,7 +1,7 @@
-'use client'
+﻿'use client'
 
 import { useConfirm } from '@/components/ui/ConfirmProvider';
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
@@ -21,9 +21,10 @@ interface AdminControlsProps {
   startingPrice?: number
   auctionStatus?: string
   eligibleBiddersCount?: number
+  activeBiddersCount?: number
 }
 
-export default function AdminControls({ gemId, currentPrice, minIncrement, status, roundEndTime, auctionType, highestBid, allRegisteredBiddersBid, hasNoBidsInCurrentRound, startingPrice, auctionStatus, eligibleBiddersCount }: AdminControlsProps) {
+export default function AdminControls({ gemId, currentPrice, minIncrement, status, roundEndTime, auctionType, highestBid, allRegisteredBiddersBid, hasNoBidsInCurrentRound, startingPrice, auctionStatus, eligibleBiddersCount, activeBiddersCount = 0 }: AdminControlsProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const confirm = useConfirm()
@@ -36,6 +37,11 @@ export default function AdminControls({ gemId, currentPrice, minIncrement, statu
   const [mounted, setMounted] = useState(false)
   const [useCustomIncrement, setUseCustomIncrement] = useState(false)
   const [countdown, setCountdown] = useState('')
+  const hasRefreshedRef = useRef(false)
+
+  useEffect(() => {
+    hasRefreshedRef.current = false
+  }, [roundEndTime])
 
   const isProgressiveElimination = auctionType === 'progressive_elimination_auction'
   const isIncrementalApproval = auctionType === 'incremental_approval_auction'
@@ -69,6 +75,10 @@ export default function AdminControls({ gemId, currentPrice, minIncrement, statu
 
       if (distance <= 0 || forceStop) {
         setCountdown('00:00')
+        if (!hasRefreshedRef.current) {
+          hasRefreshedRef.current = true
+          router.refresh()
+        }
         return
       }
 
@@ -318,7 +328,7 @@ export default function AdminControls({ gemId, currentPrice, minIncrement, statu
 
               {(status === 'active' || status === 'ended') && roundEndTime && isBiddingFinished && (
                 <>
-                  {hasNoBidsInCurrentRound ? (
+                  {hasNoBidsInCurrentRound || (eligibleBiddersCount !== undefined && eligibleBiddersCount === 1) ? (
                     <button
                       onClick={() => setShowAnnounceWinnerModal(true)}
                       disabled={loading}
@@ -378,16 +388,7 @@ export default function AdminControls({ gemId, currentPrice, minIncrement, statu
 
               {(status === 'active' || status === 'ended') && roundEndTime && (!isRoundActive || allRegisteredBiddersBid) && (
                 <>
-                  {eligibleBiddersCount !== undefined && eligibleBiddersCount === 1 ? (
-                    <button
-                      onClick={() => setShowAnnounceWinnerModal(true)}
-                      disabled={loading}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50"
-                    >
-                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trophy className="w-4 h-4" />}
-                      Announce Winner
-                    </button>
-                  ) : hasNoBidsInCurrentRound ? (
+                  {hasNoBidsInCurrentRound ? (
                     <button
                       onClick={() => setShowNextRoundModal(true)}
                       disabled={loading}
@@ -395,6 +396,15 @@ export default function AdminControls({ gemId, currentPrice, minIncrement, statu
                     >
                       {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <SkipForward className="w-4 h-4" />}
                       Decrease Price Round
+                    </button>
+                  ) : ((eligibleBiddersCount !== undefined && eligibleBiddersCount === 1) || activeBiddersCount === 1) ? (
+                    <button
+                      onClick={() => setShowAnnounceWinnerModal(true)}
+                      disabled={loading}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trophy className="w-4 h-4" />}
+                      Announce Winner
                     </button>
                   ) : (
                     <>

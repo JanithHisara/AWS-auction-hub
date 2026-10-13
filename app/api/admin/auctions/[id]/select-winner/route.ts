@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requirePermission, requireAuctionManager } from '@/lib/auth'
 import { PERMISSIONS } from '@/lib/permissions'
@@ -25,7 +25,7 @@ export async function POST(
         current_price,
         auction_id,
         gem_images(image_url),
-        auction:auctions(name)
+        auction:auctions(name, auction_type)
       `)
       .eq('id', id)
       .single()
@@ -54,6 +54,22 @@ export async function POST(
 
     if (!winningBid) {
       return NextResponse.json({ error: 'No bids found for this auction' }, { status: 404 })
+    }
+
+        const auctionRaw = gem.auction as unknown
+    const auctionData = Array.isArray(auctionRaw)
+      ? (auctionRaw[0] as { name?: string; auction_type?: string } | undefined)
+      : (auctionRaw as { name?: string; auction_type?: string } | null)
+
+    if (auctionData?.auction_type === 'incremental_approval_auction') {
+      try {
+        await adminDb.rpc('eliminate_non_approvers', {
+          p_gem_id: id,
+          p_price: gem.current_price || 0,
+        })
+      } catch (e) {
+        console.error('Failed to eliminate non-approvers on select winner:', e)
+      }
     }
 
     // Create auction winner record

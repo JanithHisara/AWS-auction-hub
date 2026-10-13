@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -36,6 +36,18 @@ export default function GemDetailClient({ gemId, auctionId, children }: Props) {
           schema: 'public',
           table: 'gems',
           filter: `id=eq.${gemId}`,
+        },
+        () => {
+          router.refresh()
+        }
+      )
+            .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'gem_eliminations',
+          filter: `gem_id=eq.${gemId}`,
         },
         () => {
           router.refresh()
