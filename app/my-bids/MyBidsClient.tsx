@@ -2,264 +2,273 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, ChevronUp } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
-import MediaRenderer from '@/components/gems/MediaRenderer'
-import LocalTime from '@/components/ui/LocalTime'
+import { 
+  Gavel, Trophy, Search, ExternalLink, ArrowUpRight, Flame
+} from 'lucide-react'
+import BiddingItemCard, { BiddingItem, BidRecord } from '@/components/bids/BiddingItemCard'
 
-interface BidItem {
-  id: string
-  bid_amount: number
-  points_earned: number
-  created_at: string
-  gem_id: string
-  gem: {
-    id: string
-    name: string
-    description: string
-    starting_price: number
-    current_price: number
-    status: string
-    end_time: string
-    carat_weight: number | null
-    cut: string | null
-    color: string | null
-    clarity: string | null
-    provenance: string | null
-    auction_id: string | null
-  }
-  highestBid: number
-  images: { image_url: string; media_type: string }[]
-  auctionName: string | null
-  auctionId: string | null
-}
+export type { BiddingItem, BidRecord }
 
 interface Props {
-  bids: BidItem[]
+  items: BiddingItem[]
+  currentUserId: string
 }
 
-export default function MyBidsClient({ bids }: Props) {
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+type FilterTab = 'all' | 'won' | 'leading' | 'outbid'
 
-  const toggleExpand = (bidId: string) => {
-    setExpandedItems(prev => {
-      const next = new Set(prev)
-      if (next.has(bidId)) next.delete(bidId)
-      else next.add(bidId)
-      return next
-    })
-  }
+export default function MyBidsClient({ items, currentUserId }: Props) {
+  const [filterTab, setFilterTab] = useState<FilterTab>('all')
+  const [searchQuery, setSearchQuery] = useState('')
 
-  // Group bids by auction
-  const grouped = bids.reduce<Record<string, { auctionName: string; auctionId: string | null; bids: BidItem[] }>>((acc, bid) => {
-    const key = bid.auctionId || 'standalone'
+  // Filter items based on tab and search
+  const filteredItems = items.filter(item => {
+    // Search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      const matchName = item.name.toLowerCase().includes(q)
+      const matchAuction = (item.auction?.name || '').toLowerCase().includes(q)
+      const matchDesc = (item.description || '').toLowerCase().includes(q)
+      if (!matchName && !matchAuction && !matchDesc) return false
+    }
+
+    // Filter tab
+    if (filterTab === 'won') {
+      return item.isUserWinner
+    }
+    if (filterTab === 'leading') {
+      return item.isUserLeading && !item.isUserWinner
+    }
+    if (filterTab === 'outbid') {
+      return !item.isUserWinner && !item.isUserLeading
+    }
+
+    return true
+  })
+
+  // Group items by Main Category: Auction
+  const groupedByAuction = filteredItems.reduce<Record<string, {
+    auctionId: string
+    auctionName: string
+    auctionType?: string | null
+    auctionStatus?: string
+    auctionCode?: string | null
+    items: BiddingItem[]
+  }>>((acc, item) => {
+    const key = item.auctionId || 'standalone'
     if (!acc[key]) {
       acc[key] = {
-        auctionName: bid.auctionName || 'Standalone Items',
-        auctionId: bid.auctionId,
-        bids: [],
+        auctionId: item.auctionId || 'standalone',
+        auctionName: item.auction?.name || 'Independent Items',
+        auctionType: item.auction?.auctionType,
+        auctionStatus: item.auction?.status,
+        auctionCode: item.auction?.auctionCode,
+        items: [],
       }
     }
-    acc[key].bids.push(bid)
+    acc[key].items.push(item)
     return acc
   }, {})
 
+  // Calculate high-level stats
+  const totalBidsCount = items.reduce((sum, item) => sum + item.bids.filter(b => b.isCurrentUser).length, 0)
+  const wonCount = items.filter(i => i.isUserWinner).length
+  const leadingCount = items.filter(i => i.isUserLeading).length
+  const uniqueAuctionsCount = Object.keys(groupedByAuction).length
+
   return (
     <div className="min-h-screen bg-[var(--background)] relative">
-      <div className="fixed inset-0 bg-grid-pattern opacity-30" />
+      <div className="fixed inset-0 bg-grid-pattern opacity-25" />
       
-      <div className="relative z-10 max-w-4xl mx-auto px-4 py-12">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-          <h1 className="text-3xl sm:text-4xl font-black text-white">My Bids</h1>
-          <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[var(--surface)] rounded-full text-[var(--text-secondary)] text-sm">
-            {bids.length} total bid{bids.length !== 1 ? 's' : ''}
-          </span>
+      <div className="relative z-10 max-w-5xl mx-auto px-4 py-8 sm:py-12">
+        {/* Header & Title */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-black uppercase tracking-wider text-[var(--gold)] px-2.5 py-0.5 rounded-full bg-[var(--gold)]/10 border border-[var(--gold)]/20 flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5" /> Bidding Hub
+              </span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+              My Bidding History
+            </h1>
+            <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">
+              Organized auction-wise with all items, winning summaries, and full bidder histories.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link 
+              href="/"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[var(--surface-elevated)] border border-[var(--border)] text-white hover:border-[var(--gold)]/40 hover:text-[var(--gold)] transition-all"
+            >
+              Browse Auctions <ArrowUpRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
 
-        <div className="space-y-8">
-          {Object.entries(grouped).map(([key, group]) => (
-            <section key={key}>
-              <div className="flex items-center gap-3 mb-4">
-                <h2 className="text-xl font-bold text-white">{group.auctionName}</h2>
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--surface)] text-[var(--text-muted)] border border-[var(--border)]">
-                  {group.bids.length} item{group.bids.length !== 1 ? 's' : ''}
-                </span>
-              </div>
+        {/* Quick Stats Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
+          <div className="card-glass rounded-2xl p-4 border border-[var(--border)]">
+            <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase">Participated</p>
+            <p className="text-2xl font-black text-white mt-1">{items.length} <span className="text-xs font-normal text-[var(--text-muted)]">Items</span></p>
+            <p className="text-[10px] text-[var(--text-secondary)] mt-1">across {uniqueAuctionsCount} auctions</p>
+          </div>
 
-              <div className="space-y-3">
-                {group.bids.map((bid) => {
-                  const { gem } = bid
-                  const isHighest = bid.bid_amount >= bid.highestBid
-                  const isActive = gem.status === 'active'
-                  const isExpanded = expandedItems.has(bid.id)
+          <div className="card-glass rounded-2xl p-4 border border-[var(--border)] bg-gradient-to-br from-amber-500/5 to-transparent">
+            <p className="text-[11px] font-bold text-[var(--gold)] uppercase flex items-center gap-1">
+              <Trophy className="w-3.5 h-3.5" /> Won Items
+            </p>
+            <p className="text-2xl font-black text-[var(--gold)] mt-1">{wonCount}</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">Winning bidder</p>
+          </div>
 
-                  return (
-                    <div key={bid.id} className="card-glass rounded-xl overflow-hidden">
-                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 p-4 sm:p-5">
-                        {/* Thumbnail */}
-                        <div className="flex-shrink-0 w-full sm:w-20 h-32 sm:h-20 md:w-24 md:h-24 rounded-xl overflow-hidden bg-[var(--surface)]">
-                          {bid.images[0]?.image_url ? (
-                            <MediaRenderer
-                              src={bid.images[0].image_url}
-                              alt={gem.name}
-                              mediaType={bid.images[0].media_type}
-                              className="w-full h-full object-cover"
-                              controls={false}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-3xl opacity-30"></div>
-                          )}
-                        </div>
+          <div className="card-glass rounded-2xl p-4 border border-[var(--border)]">
+            <p className="text-[11px] font-bold text-emerald-400 uppercase flex items-center gap-1">
+              <Flame className="w-3.5 h-3.5" /> Leading
+            </p>
+            <p className="text-2xl font-black text-emerald-400 mt-1">{leadingCount}</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">Active highest bids</p>
+          </div>
 
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <Link href={`/gems/${gem.id}`} className="text-base sm:text-lg font-bold text-white hover:text-[var(--gold)] transition-colors truncate">
-                              {gem.name}
-                            </Link>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              {isHighest && isActive && (
-                                <span className="px-2 py-0.5 bg-[var(--gold)] text-black text-xs font-bold rounded-full">
-                                  LEADING
-                                </span>
-                              )}
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold capitalize ${
-                                isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--surface)] text-[var(--text-muted)]'
-                              }`}>
-                                {gem.status}
-                              </span>
-                            </div>
-                          </div>
+          <div className="card-glass rounded-2xl p-4 border border-[var(--border)]">
+            <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase">Total Bids</p>
+            <p className="text-2xl font-black text-white mt-1">{totalBidsCount}</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">Placed by you</p>
+          </div>
+        </div>
 
-                          <div className="grid grid-cols-3 gap-2 text-sm mb-2">
-                            <div>
-                              <p className="text-[10px] sm:text-xs text-[var(--text-muted)]">Your Bid</p>
-                              <p className="text-[var(--gold)] font-bold font-mono">{formatCurrency(bid.bid_amount)}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] sm:text-xs text-[var(--text-muted)]">Highest</p>
-                              <p className="text-white font-bold font-mono">{formatCurrency(bid.highestBid)}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] sm:text-xs text-[var(--text-muted)]">Placed</p>
-                              <p className="text-[var(--text-secondary)] text-xs"><LocalTime date={bid.created_at} format="full" /></p>
-                            </div>
-                          </div>
+        {/* Search & Filter Toolbar */}
+        <div className="card-glass rounded-2xl p-3 border border-[var(--border)] mb-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+          {/* Tabs */}
+          <div className="flex gap-1 w-full sm:w-auto bg-[var(--background)] p-1 rounded-xl border border-[var(--border)]">
+            <button
+              onClick={() => setFilterTab('all')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                filterTab === 'all'
+                  ? 'bg-[var(--gold)] text-black shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-white'
+              }`}
+            >
+              All Items ({items.length})
+            </button>
+            <button
+              onClick={() => setFilterTab('won')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                filterTab === 'won'
+                  ? 'bg-amber-500 text-black shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-white'
+              }`}
+            >
+              Won ({wonCount})
+            </button>
+            <button
+              onClick={() => setFilterTab('leading')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                filterTab === 'leading'
+                  ? 'bg-emerald-500 text-black shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-white'
+              }`}
+            >
+              Leading ({leadingCount})
+            </button>
+            <button
+              onClick={() => setFilterTab('outbid')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                filterTab === 'outbid'
+                  ? 'bg-rose-500 text-white shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-white'
+              }`}
+            >
+              Outbid
+            </button>
+          </div>
 
-                          {bid.points_earned > 0 && (
-                            <span className="text-xs text-[var(--gold)]">+{bid.points_earned} pts</span>
-                          )}
-                        </div>
+          {/* Search bar */}
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <input
+              type="text"
+              placeholder="Search by auction or item name..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--gold)] transition-colors"
+            />
+          </div>
+        </div>
+
+        {/* Main Content: Grouped by Auction Header (Main Category) */}
+        {Object.keys(groupedByAuction).length === 0 ? (
+          <div className="card-glass rounded-2xl p-12 text-center border border-[var(--border)]">
+            <p className="text-sm text-[var(--text-muted)]">No bidding items match your current filter.</p>
+          </div>
+        ) : (
+          <div className="space-y-10">
+            {Object.entries(groupedByAuction).map(([key, group]) => (
+              <section key={key} className="space-y-4">
+                {/* Main Category: Auction Header */}
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 shadow-md">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[var(--gold)]/15 border border-[var(--gold)]/30 flex items-center justify-center text-[var(--gold)] shrink-0">
+                        <Gavel className="w-5 h-5" />
                       </div>
-
-                      {/* Expand/Collapse */}
-                      <button
-                        onClick={() => toggleExpand(bid.id)}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-t border-[var(--border)] text-sm text-[var(--text-muted)] hover:text-white hover:bg-[var(--surface)] transition-colors"
-                      >
-                        {isExpanded ? (
-                          <><ChevronUp className="w-4 h-4" /> Hide Details</>
-                        ) : (
-                          <><ChevronDown className="w-4 h-4" /> More Details</>
-                        )}
-                      </button>
-
-                      {/* Expanded Details */}
-                      {isExpanded && (
-                        <div className="border-t border-[var(--border)] p-4 sm:p-5 bg-[var(--surface)]/50 space-y-4">
-                          {/* Description */}
-                          {gem.description && (
-                            <div>
-                              <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase mb-1">Description</h4>
-                              <p className="text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-line">
-                                {gem.description}
-                              </p>
-                            </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                            {group.auctionName}
+                          </h2>
+                          {group.auctionCode && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[var(--text-muted)] font-mono">
+                              {group.auctionCode}
+                            </span>
                           )}
-
-                          {/* Specifications */}
-                          {(gem.carat_weight || gem.cut || gem.color || gem.clarity) && (
-                            <div>
-                              <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">Specifications</h4>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                {gem.carat_weight && (
-                                  <div className="p-2 bg-[var(--background)] rounded-lg">
-                                    <p className="text-[10px] text-[var(--text-muted)]">Carat</p>
-                                    <p className="text-sm font-bold text-white">{gem.carat_weight} ct</p>
-                                  </div>
-                                )}
-                                {gem.cut && (
-                                  <div className="p-2 bg-[var(--background)] rounded-lg">
-                                    <p className="text-[10px] text-[var(--text-muted)]">Cut</p>
-                                    <p className="text-sm font-bold text-white">{gem.cut}</p>
-                                  </div>
-                                )}
-                                {gem.color && (
-                                  <div className="p-2 bg-[var(--background)] rounded-lg">
-                                    <p className="text-[10px] text-[var(--text-muted)]">Color</p>
-                                    <p className="text-sm font-bold text-white">{gem.color}</p>
-                                  </div>
-                                )}
-                                {gem.clarity && (
-                                  <div className="p-2 bg-[var(--background)] rounded-lg">
-                                    <p className="text-[10px] text-[var(--text-muted)]">Clarity</p>
-                                    <p className="text-sm font-bold text-white">{gem.clarity}</p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Provenance */}
-                          {gem.provenance && (
-                            <div>
-                              <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase mb-1">Provenance</h4>
-                              <p className="text-sm text-[var(--text-secondary)]">{gem.provenance}</p>
-                            </div>
-                          )}
-
-                          {/* Images Gallery */}
-                          {bid.images.length > 0 && (
-                            <div>
-                              <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">Images</h4>
-                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                {bid.images.map((img, idx) => (
-                                  <div key={idx} className="aspect-square rounded-lg overflow-hidden bg-[var(--background)]">
-                                    <MediaRenderer
-                                      src={img.image_url}
-                                      alt={`${gem.name} - ${idx + 1}`}
-                                      mediaType={img.media_type}
-                                      className="w-full h-full object-cover"
-                                      controls={false}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Price Info */}
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="p-3 bg-[var(--background)] rounded-lg">
-                              <p className="text-[10px] text-[var(--text-muted)]">Starting Price</p>
-                              <p className="text-sm font-bold text-[var(--gold)]">{formatCurrency(gem.starting_price)}</p>
-                            </div>
-                            <div className="p-3 bg-[var(--background)] rounded-lg">
-                              <p className="text-[10px] text-[var(--text-muted)]">Current Price</p>
-                              <p className="text-sm font-bold text-white">{formatCurrency(gem.current_price)}</p>
-                            </div>
-                          </div>
                         </div>
+                        <p className="text-xs text-[var(--text-muted)] mt-0.5 flex items-center gap-2">
+                          <span>{group.items.length} {group.items.length === 1 ? 'Item' : 'Items'} participating</span>
+                          {group.auctionType && (
+                            <span>• {group.auctionType.replace(/_/g, ' ')}</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {group.auctionStatus && (
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                          group.auctionStatus === 'live'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : group.auctionStatus === 'completed' || group.auctionStatus === 'ended'
+                              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                              : 'bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold)]/30'
+                        }`}>
+                          {group.auctionStatus.replace(/_/g, ' ')}
+                        </span>
+                      )}
+
+                      {group.auctionId !== 'standalone' && (
+                        <Link
+                          href={`/auctions/${group.auctionId}`}
+                          className="p-2 rounded-xl text-[var(--text-muted)] hover:text-white hover:bg-[var(--surface-elevated)] transition-colors"
+                          title="View Auction Lobby"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Link>
                       )}
                     </div>
-                  )
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
+                  </div>
+                </div>
+
+                {/* Sub-Category: Items inside this Auction (Shown by Default) */}
+                <div className="space-y-4">
+                  {group.items.map((item) => (
+                    <BiddingItemCard key={item.id} item={item} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
 }
-
