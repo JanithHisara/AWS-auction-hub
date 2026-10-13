@@ -1,6 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function GET(
   request: Request,
@@ -9,9 +12,9 @@ export async function GET(
   try {
     const { id } = await params
     await requireAuth()
-    const supabase = await createClient()
+    const adminDb = createAdminClient()
 
-    const { data: messages, error } = await supabase
+    const { data: messages, error } = await adminDb
       .from('chat_messages')
       .select('*, sender:users!chat_messages_sender_id_fkey(id, email, display_name, anonymous_name)')
       .eq('conversation_id', id)
@@ -19,7 +22,7 @@ export async function GET(
 
     if (error) throw error
 
-    return NextResponse.json(messages)
+    return NextResponse.json(messages || [])
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to get messages'
     return NextResponse.json({ error: message }, { status: 500 })
@@ -33,16 +36,16 @@ export async function POST(
   try {
     const { id } = await params
     const user = await requireAuth()
-    const supabase = await createClient()
+    const adminDb = createAdminClient()
     const { content } = await request.json()
 
     if (!content?.trim()) {
       return NextResponse.json({ error: 'Message content is required' }, { status: 400 })
     }
 
-    const { data: conversation } = await supabase
+    const { data: conversation } = await adminDb
       .from('chat_conversations')
-      .select('*')
+      .select('*, auction:auctions(id, name, status)')
       .eq('id', id)
       .single()
 
@@ -50,7 +53,11 @@ export async function POST(
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    const { data: userData } = await supabase
+    if (conversation.auction?.status === 'ended' || conversation.auction?.status === 'completed') {
+      return NextResponse.json({ error: 'Chat is closed because this auction has ended' }, { status: 400 })
+    }
+
+    const { data: userData } = await adminDb
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -63,7 +70,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const { data: msg, error: msgError } = await supabase
+    const { data: msg, error: msgError } = await adminDb
       .from('chat_messages')
       .insert({
         conversation_id: id,
@@ -92,7 +99,7 @@ export async function POST(
       convUpdate.unread_by_user = 0
     }
 
-    await supabase
+    await adminDb
       .from('chat_conversations')
       .update(convUpdate)
       .eq('id', id)

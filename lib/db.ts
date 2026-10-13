@@ -153,6 +153,18 @@ export async function executeRpc(fnName: string, args: any = {}): Promise<{ data
         data: { status: 'ended' },
       })
 
+      try {
+        await prisma.chatConversation.deleteMany({
+          where: {
+            auction: {
+              status: { in: ['ended', 'completed'] }
+            }
+          }
+        })
+      } catch (err) {
+        console.error('Failed to cleanup ended auction chat in db.ts:', err)
+      }
+
       return { data: { success: true }, error: null }
     }
 

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -18,6 +18,8 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
   const [isSending, setIsSending] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [isEnded, setIsEnded] = useState(false)
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
@@ -26,24 +28,51 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
+  // Listen for open-auction-chat event from GlobalChatNotifier
   useEffect(() => {
-    const fetchConversation = async () => {
+    const handleOpenChat = (e: any) => {
+      const targetAuctionId = e.detail?.auctionId
+      if (!targetAuctionId || targetAuctionId === auctionId) {
+        setIsOpen(true)
+      }
+    }
+    window.addEventListener('open-auction-chat', handleOpenChat)
+    return () => window.removeEventListener('open-auction-chat', handleOpenChat)
+  }, [auctionId])
+
+  // Fetch conversation for this auction
+  const fetchConversation = useCallback(async () => {
+    try {
       const res = await fetch(`/api/chat/conversations?auction_id=${auctionId}`)
+      if (res.status === 400) {
+        const err = await res.json()
+        if (err.error?.includes('ended')) {
+          setIsEnded(true)
+          return
+        }
+      }
+      if (!res.ok) return
       const data = await res.json()
       if (data?.id) {
         setConversation(data)
         setUnreadCount(data.unread_by_user || 0)
       }
+    } catch (e) {
+      console.error('Failed to load conversation:', e)
     }
-    fetchConversation()
   }, [auctionId])
 
   useEffect(() => {
-    if (!conversation?.id || !isOpen) return
+    fetchConversation()
+  }, [fetchConversation])
 
-    const fetchMessages = async () => {
-      setIsLoading(true)
+  // Fetch messages
+  const fetchMessages = useCallback(async (isSilent = false) => {
+    if (!conversation?.id) return
+    if (!isSilent) setIsLoading(true)
+    try {
       const res = await fetch(`/api/chat/conversations/${conversation.id}/messages`)
+      if (!res.ok) return
       const data = await res.json()
       if (Array.isArray(data)) {
         setMessages(prev => {
@@ -51,24 +80,41 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
           return [...data, ...optimistic]
         })
       }
-      setIsLoading(false)
-      setTimeout(scrollToBottom, 100)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      if (!isSilent) setIsLoading(false)
     }
-    fetchMessages()
+  }, [conversation?.id])
 
+  useEffect(() => {
+    if (!conversation?.id || !isOpen) return
+
+    fetchMessages(false)
+    setTimeout(scrollToBottom, 100)
+
+    // Mark as read
     fetch(`/api/chat/conversations/${conversation.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'mark_read' }),
-    })
+    }).catch(() => {})
     setUnreadCount(0)
-  }, [conversation?.id, isOpen, scrollToBottom])
 
+    // Poll messages every 3s while open for reliable delivery
+    const timer = setInterval(() => {
+      fetchMessages(true)
+    }, 3000)
+
+    return () => clearInterval(timer)
+  }, [conversation?.id, isOpen, fetchMessages, scrollToBottom])
+
+  // Realtime subscription via Supabase if available
   useEffect(() => {
-    if (!conversation?.id) return
+    if (!conversation?.id || !isOpen) return
 
     const channel = supabase
-      .channel(`chat-user-${conversation.id}`)
+      .channel(`chat-msgs-${conversation.id}`)
       .on(
         'postgres_changes',
         {
@@ -77,26 +123,11 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
           table: 'chat_messages',
           filter: `conversation_id=eq.${conversation.id}`,
         },
-        async (payload) => {
+        (payload) => {
           const newMsg = payload.new as ChatMessage
           if (newMsg.sender_id === userId) return
-
-          const enriched: ChatMessage = {
-            ...newMsg,
-            sender: { id: '', email: '', role: 'admin', created_at: '', display_name: 'Support' } as ChatMessage['sender'],
-          }
-          setMessages(prev => [...prev, enriched])
-
-          if (isOpen) {
-            fetch(`/api/chat/conversations/${conversation.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'mark_read' }),
-            })
-            setTimeout(scrollToBottom, 100)
-          } else {
-            setUnreadCount(prev => prev + 1)
-          }
+          setMessages(prev => [...prev, newMsg])
+          setTimeout(scrollToBottom, 50)
         }
       )
       .subscribe()
@@ -104,39 +135,11 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [conversation?.id, userId, isOpen, supabase, scrollToBottom])
-
-  // Also listen for conversation creation (if another flow creates it)
-  useEffect(() => {
-    if (conversation?.id) return
-
-    const channel = supabase
-      .channel(`chat-conv-watch-${auctionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_conversations',
-          filter: `auction_id=eq.${auctionId}`,
-        },
-        (payload) => {
-          const newConv = payload.new as ChatConversation
-          if (newConv.user_id === userId) {
-            setConversation(newConv)
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [conversation?.id, auctionId, userId, supabase])
+  }, [conversation?.id, isOpen, userId, supabase, scrollToBottom])
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isSending) return
+    if (!input.trim() || isSending || isEnded) return
 
     const messageContent = input.trim()
     setInput('')
@@ -152,6 +155,11 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
           body: JSON.stringify({ auction_id: auctionId }),
         })
         const convData = await convRes.json()
+        if (convRes.status === 400 && convData.error?.includes('ended')) {
+          setIsEnded(true)
+          alert('This auction has ended. Chat is closed.')
+          return
+        }
         if (!convData?.id) throw new Error('Failed to create conversation')
         setConversation(convData)
         convId = convData.id
@@ -198,6 +206,7 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
         <button
           onClick={() => setIsOpen(true)}
           className="fixed bottom-4 left-4 z-50 w-14 h-14 bg-[var(--gold)] hover:bg-[var(--gold-dark)] text-black rounded-full shadow-lg shadow-[var(--gold-glow)] flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+          aria-label="Open support chat"
         >
           <MessageCircle className="w-6 h-6" />
           {unreadCount > 0 && (
@@ -218,8 +227,8 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
                 <MessageCircle className="w-4 h-4 text-[var(--gold)]" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white">Support</h3>
-                <p className="text-xs text-emerald-400">Online</p>
+                <h3 className="text-sm font-bold text-white">Auction Support</h3>
+                <p className="text-xs text-emerald-400">Admin Team Online</p>
               </div>
             </div>
             <button
@@ -232,7 +241,17 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-            {isLoading ? (
+            {isEnded ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                <div className="w-12 h-12 bg-red-500/10 text-red-400 rounded-full flex items-center justify-center mb-3">
+                  <X className="w-6 h-6" />
+                </div>
+                <p className="text-sm font-bold text-white mb-1">Auction Ended</p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Chat is closed and message history has been erased for this auction.
+                </p>
+              </div>
+            ) : isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" />
               </div>
@@ -241,8 +260,10 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
                 <div className="w-12 h-12 bg-[var(--surface)] rounded-full flex items-center justify-center mb-3">
                   <MessageCircle className="w-6 h-6 text-[var(--text-muted)]" />
                 </div>
-                <p className="text-sm text-[var(--text-secondary)] mb-1">Need help?</p>
-                <p className="text-xs text-[var(--text-muted)]">Send a message and our team will respond shortly.</p>
+                <p className="text-sm text-[var(--text-secondary)] mb-1">Need assistance?</p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Ask our auction moderators any questions regarding bidding, items, or rules.
+                </p>
               </div>
             ) : (
               messages.map((msg) => {
@@ -252,20 +273,20 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
                     key={msg.id}
                     className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div className={`max-w-[80%] ${isUser ? 'order-1' : 'order-1'}`}>
+                    <div className="max-w-[80%]">
                       {!isUser && (
-                        <p className="text-[10px] text-[var(--gold)] font-medium mb-1 ml-1">Support</p>
+                        <p className="text-[10px] text-[var(--gold)] font-medium mb-1 ml-1">Support Admin</p>
                       )}
                       <div
-                        className={`px-3 py-2 rounded-2xl text-sm leading-relaxed ${
+                        className={`px-3 py-2 rounded-2xl text-xs leading-relaxed ${
                           isUser
-                            ? 'bg-[var(--gold)] text-black rounded-br-md'
+                            ? 'bg-[var(--gold)] text-black font-medium rounded-br-md'
                             : 'bg-[var(--surface)] text-white rounded-bl-md border border-[var(--border)]'
                         }`}
                       >
                         {msg.content}
                       </div>
-                      <p className={`text-[10px] text-[var(--text-muted)] mt-1 ${isUser ? 'text-right mr-1' : 'ml-1'}`}>
+                      <p className={`text-[9px] text-[var(--text-muted)] mt-1 ${isUser ? 'text-right mr-1' : 'ml-1'}`}>
                         {formatTime(msg.created_at)}
                       </p>
                     </div>
@@ -277,30 +298,32 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
           </div>
 
           {/* Input */}
-          <form onSubmit={handleSend} className="px-3 py-3 border-t border-[var(--border)] bg-[var(--surface)]">
-            <div className="flex items-center gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-white placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--gold)]/50"
-                autoComplete="off"
-              />
-              <button
-                type="submit"
-                disabled={!input.trim() || isSending}
-                className="w-10 h-10 bg-[var(--gold)] hover:bg-[var(--gold-dark)] disabled:opacity-40 disabled:hover:bg-[var(--gold)] text-black rounded-xl flex items-center justify-center transition-colors flex-shrink-0"
-              >
-                {isSending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-          </form>
+          {!isEnded && (
+            <form onSubmit={handleSend} className="px-3 py-3 border-t border-[var(--border)] bg-[var(--surface)]">
+              <div className="flex items-center gap-2">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Type a message to support..."
+                  className="flex-1 bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--gold)]/50"
+                  autoComplete="off"
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isSending}
+                  className="w-9 h-9 bg-[var(--gold)] hover:bg-[var(--gold-dark)] disabled:opacity-40 disabled:hover:bg-[var(--gold)] text-black rounded-xl flex items-center justify-center transition-colors flex-shrink-0"
+                >
+                  {isSending ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       )}
     </>

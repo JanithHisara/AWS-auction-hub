@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
       await prisma.auction.updateMany({
         where: {
-          status: { in: ['registration_closed', 'upcoming'] },
+          status: { in: ['registration_open', 'upcoming'] },
           auctionStart: { lte: now },
           auctionEnd: { gt: now },
         },
@@ -45,6 +45,18 @@ export async function GET(request: NextRequest) {
         },
         data: { status: 'ended' },
       })
+
+      try {
+        await prisma.chatConversation.deleteMany({
+          where: {
+            auction: {
+              status: { in: ['ended', 'completed'] }
+            }
+          }
+        })
+      } catch (err) {
+        console.error('Failed to cleanup ended auction chat in sync:', err)
+      }
     } catch (schedErr) {
       console.error('Schedule processing error in sync route:', schedErr)
     }

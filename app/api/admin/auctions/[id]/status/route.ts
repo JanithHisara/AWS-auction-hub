@@ -82,6 +82,18 @@ export async function POST(
       }
     }
 
+    if (status === 'ended' || status === 'completed') {
+      try {
+        await adminDb
+          .from('chat_conversations')
+          .delete()
+          .eq('auction_id', id)
+        console.log('Erased all chat conversations for ended auction ' + id)
+      } catch (chatErr) {
+        console.error('Failed to erase chat for ended auction:', chatErr)
+      }
+    }
+
     // When auction goes live, notify all approved registered users via email
     if (status === 'live') {
       try {
