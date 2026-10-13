@@ -1,4 +1,4 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
@@ -129,7 +129,7 @@ export async function POST(
       .order('created_at', { ascending: false })
       .limit(1)
 
-      if (elimination) {
+      if (elimination && elimination.length > 0) {
         return NextResponse.json({ error: 'You have been eliminated from this auction item' }, { status: 403 })
       }
 

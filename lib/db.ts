@@ -179,7 +179,7 @@ export async function executeRpc(fnName: string, args: any = {}): Promise<{ data
 
     if (fnName === 'eliminate_non_approvers') {
       const gemId = args.p_gem_id
-      const currentPrice = args.p_current_price
+      const currentPrice = args.p_price ?? args.p_current_price
       if (!gemId) return { data: null, error: null }
 
       const gem = await prisma.gem.findUnique({ where: { id: gemId } })
