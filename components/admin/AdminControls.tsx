@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
-import { Loader2, Play, SkipForward, Trophy, Square, Clock } from 'lucide-react'
+import { Loader2, Play, SkipForward, Trophy, Square, Clock, Lock } from 'lucide-react'
 import Decimal from 'decimal.js'
 
 interface AdminControlsProps {
@@ -297,18 +297,34 @@ export default function AdminControls({ gemId, currentPrice, minIncrement, statu
             </button>
           )}
 
-          {/* TENDER BASE / FIXED BID CONTROLS */}
-          {isTenderBaseFixedBid && (auctionStatus === 'registration_closed' || auctionStatus === 'ended' || auctionStatus === 'completed') && (
+                    {/* TENDER BASE / FIXED BID CONTROLS */}
+          {isTenderBaseFixedBid && (
             <>
-              {/* For sealed bid, admin just needs to announce winner after auction ends */}
-              <button
-                onClick={() => setShowAnnounceWinnerModal(true)}
-                disabled={loading}
-                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trophy className="w-4 h-4" />}
-                Announce Winner
-              </button>
+              {status === 'active' && (
+                <button
+                  onClick={async () => {
+                    if (await confirm('End bidding for this item? It will be marked as ended so you can announce the winner.')) {
+                      handleAction('end-round')
+                    }
+                  }}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-white font-bold rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                  End Bidding
+                </button>
+              )}
+
+              {(status === 'ended' || auctionStatus === 'registration_closed' || auctionStatus === 'ended' || auctionStatus === 'completed') && (
+                <button
+                  onClick={() => setShowAnnounceWinnerModal(true)}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trophy className="w-4 h-4" />}
+                  Announce Winner
+                </button>
+              )}
             </>
           )}
 

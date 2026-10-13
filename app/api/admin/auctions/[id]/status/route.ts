@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuctionManager } from '@/lib/auth'
 import { PERMISSIONS } from '@/lib/permissions'
@@ -64,6 +64,22 @@ export async function POST(
     if (error) {
       console.error('Update error:', error)
       return NextResponse.json({ error: 'Failed to update: ' + error.message }, { status: 500 })
+    }
+
+    if (status === 'registration_closed' || status === 'ended') {
+      const { data: auc } = await adminDb
+        .from('auctions')
+        .select('auction_type')
+        .eq('id', id)
+        .single()
+
+      if (auc?.auction_type === 'tender_base_fixed_bid') {
+        await adminDb
+          .from('gems')
+          .update({ status: 'ended' })
+          .eq('auction_id', id)
+          .eq('status', 'active')
+      }
     }
 
     // When auction goes live, notify all approved registered users via email

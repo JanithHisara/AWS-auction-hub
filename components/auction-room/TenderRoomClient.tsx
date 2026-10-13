@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import AuctionChatWidget from '@/components/chat/AuctionChatWidget'
 import { createClient } from '@/lib/supabase/client'
 import AuctionCountdown from '@/components/shared/AuctionCountdown'
@@ -38,6 +39,48 @@ export default function TenderRoomClient({ auction, items: initialItems, user, r
   const [items, setItems] = useState(initialItems)
   const [biddingInputs, setBiddingInputs] = useState<Record<string, string>>({})
   const [submittingGems, setSubmittingGems] = useState<Record<string, boolean>>({})
+  const router = useRouter()
+  const [currentAuctionStatus, setCurrentAuctionStatus] = useState(auction.status)
+
+  useEffect(() => {
+    setCurrentAuctionStatus(auction.status)
+  }, [auction.status])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('tender-auction-room-' + auction.id)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'auctions',
+          filter: 'id=eq.' + auction.id,
+        },
+        (payload) => {
+          if (payload.new && payload.new.status) {
+            setCurrentAuctionStatus(payload.new.status)
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'gems',
+          filter: 'auction_id=eq.' + auction.id,
+        },
+        () => {
+          router.refresh()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [auction.id, supabase, router])
 
   // Bids placed by the current user
   const [userBids, setUserBids] = useState<Record<string, number>>(() => {
@@ -113,7 +156,13 @@ export default function TenderRoomClient({ auction, items: initialItems, user, r
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">{auction.name}</h1>
           <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-            <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded-md font-bold">LIVE (SEALED BID)</span>
+            <span className={`px-2 py-1 rounded-md font-bold ${
+              currentAuctionStatus === 'live' 
+                ? 'bg-red-500/20 text-red-400' 
+                : 'bg-amber-500/20 text-amber-400'
+            }`}>
+              {currentAuctionStatus === 'live' ? 'LIVE (SEALED BID)' : 'BIDDING CLOSED (SEALED BID)'}
+            </span>
             <span>Registration: #{registration.id.slice(0, 8)}</span>
           </div>
         </div>
@@ -174,26 +223,32 @@ export default function TenderRoomClient({ auction, items: initialItems, user, r
                       </div>
                     ) : null}
 
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        placeholder="Enter amount..."
-                        value={biddingInputs[gem.id] || ''}
-                        onChange={(e) => setBiddingInputs(prev => ({ ...prev, [gem.id]: e.target.value }))}
-                        className="flex-1 min-w-0 bg-black/50 border border-[var(--border)] rounded-lg px-3 text-sm focus:border-[var(--gold)] outline-none"
-                      />
-                      <button
-                        onClick={() => handlePlaceBid(gem)}
-                        disabled={isSubmitting || !biddingInputs[gem.id]}
-                        className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap transition-colors flex items-center justify-center gap-2 ${
-                          currentBid 
-                            ? 'bg-[var(--surface-elevated)] border border-[var(--border)] text-white hover:border-[var(--gold)]'
-                            : 'bg-[var(--gold)] text-black hover:bg-[var(--gold-light)]'
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : (currentBid ? 'Update Bid' : 'Place Bid')}
-                      </button>
-                    </div>
+                    {currentAuctionStatus === 'live' ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          placeholder="Enter amount..."
+                          value={biddingInputs[gem.id] || ''}
+                          onChange={(e) => setBiddingInputs(prev => ({ ...prev, [gem.id]: e.target.value }))}
+                          className="flex-1 min-w-0 bg-black/50 border border-[var(--border)] rounded-lg px-3 text-sm focus:border-[var(--gold)] outline-none"
+                        />
+                        <button
+                          onClick={() => handlePlaceBid(gem)}
+                          disabled={isSubmitting || !biddingInputs[gem.id]}
+                          className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap transition-colors flex items-center justify-center gap-2 ${
+                            currentBid 
+                              ? 'bg-[var(--surface-elevated)] border border-[var(--border)] text-white hover:border-[var(--gold)]'
+                              : 'bg-[var(--gold)] text-black hover:bg-[var(--gold-light)]'
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : (currentBid ? 'Update Bid' : 'Place Bid')}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-lg text-center">
+                        <p className="text-xs text-amber-400 font-medium">Bidding has concluded for this auction</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

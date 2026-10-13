@@ -1,4 +1,4 @@
-import prisma from '@/lib/prisma'
+﻿import prisma from '@/lib/prisma'
 import { broadcastEvent } from '@/lib/events'
 import crypto from 'crypto'
 
@@ -138,7 +138,7 @@ export async function executeRpc(fnName: string, args: any = {}): Promise<{ data
 
       await prisma.auction.updateMany({
         where: {
-          status: { in: ['registration_closed', 'upcoming'] },
+          status: { in: ['registration_open', 'upcoming'] },
           auctionStart: { lte: now },
           auctionEnd: { gt: now },
         },
