@@ -8,10 +8,12 @@ import { MessageCircle, X, Send, Loader2 } from 'lucide-react'
 interface Props {
   auctionId: string
   userId: string
+  initialOpen?: boolean
+  onClose?: () => void
 }
 
-export default function AuctionChatWidget({ auctionId, userId }: Props) {
-  const [isOpen, setIsOpen] = useState(false)
+export default function AuctionChatWidget({ auctionId, userId, initialOpen = false, onClose }: Props) {
+  const [isOpen, setIsOpen] = useState(initialOpen)
   const [conversation, setConversation] = useState<ChatConversation | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -28,7 +30,19 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
-  // Listen for open-auction-chat event from GlobalChatNotifier
+  // Register on-page widget flag
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__hasAuctionChatWidget = auctionId
+    }
+    return () => {
+      if (typeof window !== 'undefined' && (window as any).__hasAuctionChatWidget === auctionId) {
+        delete (window as any).__hasAuctionChatWidget
+      }
+    }
+  }, [auctionId])
+
+  // Listen for open-auction-chat event
   useEffect(() => {
     const handleOpenChat = (e: any) => {
       const targetAuctionId = e.detail?.auctionId
@@ -40,6 +54,14 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
     window.addEventListener('open-auction-chat', handleOpenChat)
     return () => window.removeEventListener('open-auction-chat', handleOpenChat)
   }, [auctionId])
+
+  // Sync initialOpen prop changes
+  useEffect(() => {
+    if (initialOpen) {
+      setIsOpen(true)
+      setUnreadCount(0)
+    }
+  }, [initialOpen])
 
   // Fetch or sync conversation for this auction
   const fetchConversation = useCallback(async (isSilent = false) => {
@@ -59,7 +81,6 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
       }
 
       if (!res.ok) {
-        // Conversation might have been deleted by admin
         if (res.status === 404) {
           setConversation(null)
           setMessages([])
@@ -71,12 +92,10 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
       const data = await res.json()
       if (data?.id) {
         setConversation(data)
-        // If chat is closed, update unread count for badge
         if (!isOpen) {
           setUnreadCount(data.unread_by_user || 0)
         }
       } else {
-        // Conversation deleted by admin or doesn't exist yet
         setConversation(null)
         setMessages([])
         setUnreadCount(0)
@@ -105,7 +124,6 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
       })
 
       if (res.status === 404) {
-        // Admin deleted the conversation
         setConversation(null)
         setMessages([])
         return
@@ -136,14 +154,12 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
       fetchMessages(false)
       setTimeout(scrollToBottom, 100)
 
-      // Mark read in DB
       fetch(`/api/chat/conversations/${conversation.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'mark_read' }),
       }).catch(() => {})
 
-      // Poll messages every 2.5s while open
       const timer = setInterval(() => {
         fetchMessages(true)
       }, 2500)
@@ -192,7 +208,6 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
     try {
       let convId = conversation?.id
 
-      // If conversation doesn't exist in local state, create it first
       if (!convId) {
         const convRes = await fetch('/api/chat/conversations', {
           method: 'POST',
@@ -227,7 +242,6 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
         body: JSON.stringify({ content: messageContent }),
       })
 
-      // If conversation was deleted by admin (404), seamlessly re-create conversation and retry!
       if (res.status === 404) {
         const newConvRes = await fetch('/api/chat/conversations', {
           method: 'POST',
@@ -262,6 +276,11 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const handleClose = () => {
+    setIsOpen(false)
+    onClose?.()
   }
 
   return (
@@ -300,7 +319,7 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
               </div>
             </div>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={handleClose}
               className="w-8 h-8 rounded-lg hover:bg-[var(--surface-elevated)] flex items-center justify-center text-[var(--text-muted)] hover:text-white transition-colors"
             >
               <X className="w-4 h-4" />

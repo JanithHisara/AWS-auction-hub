@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { X, MessageCircle, ArrowRight } from 'lucide-react'
+import AuctionChatWidget from '@/components/chat/AuctionChatWidget'
 
 interface NotificationItem {
   id: string
@@ -41,6 +42,8 @@ export default function GlobalChatNotifier({ userId: initialUserId, role: initia
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [userId, setUserId] = useState<string | undefined>(initialUserId)
   const [role, setRole] = useState<string | null | undefined>(initialRole)
+  const [chatAuctionId, setChatAuctionId] = useState<string | null>(null)
+  
   const seenIdsRef = useRef<Set<string>>(new Set())
   const lastCheckTimeRef = useRef<number>(Date.now() - 5000)
   const isCheckingRef = useRef(false)
@@ -52,7 +55,6 @@ export default function GlobalChatNotifier({ userId: initialUserId, role: initia
       setRole(initialRole)
       return
     }
-    // Fallback: fetch current authenticated user
     fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
@@ -91,11 +93,11 @@ export default function GlobalChatNotifier({ userId: initialUserId, role: initia
           playChime()
           setNotifications(prev => [...prev, ...newNotifs])
 
-          // Auto dismiss each after 7 seconds
+          // Auto dismiss each after 8 seconds
           newNotifs.forEach(n => {
             setTimeout(() => {
               setNotifications(prev => prev.filter(item => item.id !== n.id))
-            }, 7000)
+            }, 8000)
           })
         }
       }
@@ -115,65 +117,97 @@ export default function GlobalChatNotifier({ userId: initialUserId, role: initia
     return () => clearInterval(interval)
   }, [userId, checkNotifications])
 
-  if (!userId || notifications.length === 0) return null
+  const handleUserOpenChat = (auctionId: string, notifId: string) => {
+    // 1. Dismiss notification popup
+    setNotifications(prev => prev.filter(n => n.id !== notifId))
+
+    // 2. Dispatch custom event if on-page widget is present
+    window.dispatchEvent(new CustomEvent('open-auction-chat', {
+      detail: { auctionId }
+    }))
+
+    // 3. Check if page has an active chat widget for this auction
+    const hasOnPageWidget = typeof window !== 'undefined' && (window as any).__hasAuctionChatWidget === auctionId
+
+    // 4. If not already present on page, mount widget right here so chat opens instantly without redirecting
+    if (!hasOnPageWidget) {
+      setChatAuctionId(auctionId)
+    }
+  }
+
+  if (!userId) return null
 
   return (
-    <div className="fixed top-20 right-4 z-50 flex flex-col gap-3 pointer-events-none max-w-sm w-full">
-      {notifications.map(notif => {
-        const linkHref = isGlobalAdmin
-          ? `/admin/chat?auctionId=${encodeURIComponent(notif.auction_id)}&convId=${encodeURIComponent(notif.conversation_id)}`
-          : `/auctions/${encodeURIComponent(notif.auction_id)}`
+    <>
+      {/* Floating Chat Widget if opened from notification on a page without widget */}
+      {chatAuctionId && userId && (
+        <AuctionChatWidget
+          key={chatAuctionId}
+          auctionId={chatAuctionId}
+          userId={userId}
+          initialOpen={true}
+          onClose={() => setChatAuctionId(null)}
+        />
+      )}
 
-        const handleActionClick = (e: React.MouseEvent) => {
-          if (!isGlobalAdmin) {
-            // For regular users in an auction room, dispatch event to open chat widget directly
-            window.dispatchEvent(new CustomEvent('open-auction-chat', {
-              detail: { auctionId: notif.auction_id }
-            }))
-          }
-        }
-
-        return (
-          <div 
-            key={notif.id} 
-            className="relative overflow-hidden bg-[var(--surface-elevated)] border border-[var(--gold)]/50 rounded-2xl p-4 shadow-[0_8px_32px_-8px_rgba(255,215,0,0.25)] pointer-events-auto animate-in slide-in-from-right-8 fade-in duration-300 group hover:scale-[1.02] transition-transform"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-[var(--gold)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            
-            <div className="relative flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--gold)] to-[var(--gold-dark)] flex items-center justify-center flex-shrink-0 shadow-lg shadow-[var(--gold)]/20 mt-0.5">
-                <MessageCircle className="w-5 h-5 text-black" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs font-black text-white truncate">
-                    {notif.sender_name}
-                  </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--gold)]/20 text-[var(--gold)] font-bold truncate max-w-[130px]">
-                    {notif.auction_name}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-300 line-clamp-2 leading-relaxed">
-                  {notif.content || 'Sent a new message'}
-                </p>
-                <a 
-                  href={linkHref}
-                  onClick={handleActionClick}
-                  className="inline-flex items-center gap-1.5 mt-2.5 text-xs font-bold text-[var(--gold)] hover:text-white transition-colors"
-                >
-                  {isGlobalAdmin ? 'OPEN IN CHAT' : 'VIEW CHAT'} <ArrowRight className="w-3 h-3" />
-                </a>
-              </div>
-              <button 
-                onClick={() => setNotifications(prev => prev.filter(n => n.id !== notif.id))}
-                className="text-gray-500 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
+      {/* Notifications Container */}
+      {notifications.length > 0 && (
+        <div className="fixed top-20 right-4 z-50 flex flex-col gap-3 pointer-events-none max-w-sm w-full">
+          {notifications.map(notif => {
+            return (
+              <div 
+                key={notif.id} 
+                className="relative overflow-hidden bg-[var(--surface-elevated)] border border-[var(--gold)]/50 rounded-2xl p-4 shadow-[0_8px_32px_-8px_rgba(255,215,0,0.25)] pointer-events-auto animate-in slide-in-from-right-8 fade-in duration-300 group hover:scale-[1.02] transition-transform"
               >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )
-      })}
-    </div>
+                <div className="absolute inset-0 bg-gradient-to-r from-[var(--gold)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                
+                <div className="relative flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--gold)] to-[var(--gold-dark)] flex items-center justify-center flex-shrink-0 shadow-lg shadow-[var(--gold)]/20 mt-0.5">
+                    <MessageCircle className="w-5 h-5 text-black" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-black text-white truncate">
+                        {notif.sender_name}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--gold)]/20 text-[var(--gold)] font-bold truncate max-w-[130px]">
+                        {notif.auction_name}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-300 line-clamp-2 leading-relaxed">
+                      {notif.content || 'Sent a new message'}
+                    </p>
+                    
+                    {isGlobalAdmin ? (
+                      <a 
+                        href={`/admin/chat?auctionId=${encodeURIComponent(notif.auction_id)}&convId=${encodeURIComponent(notif.conversation_id)}`}
+                        className="inline-flex items-center gap-1.5 mt-2.5 text-xs font-bold text-[var(--gold)] hover:text-white transition-colors"
+                      >
+                        OPEN IN CHAT <ArrowRight className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      <button 
+                        type="button"
+                        onClick={() => handleUserOpenChat(notif.auction_id, notif.id)}
+                        className="inline-flex items-center gap-1.5 mt-2.5 text-xs font-bold text-[var(--gold)] hover:text-white transition-colors cursor-pointer"
+                      >
+                        OPEN CHAT <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  <button 
+                    onClick={() => setNotifications(prev => prev.filter(n => n.id !== notif.id))}
+                    className="text-gray-500 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
+                    title="Dismiss"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </>
   )
 }
