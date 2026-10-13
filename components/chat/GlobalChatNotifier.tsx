@@ -20,6 +20,9 @@ function playChime() {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
     if (!AudioContextClass) return
     const ctx = new AudioContextClass()
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {})
+    }
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.type = 'sine'
@@ -34,11 +37,32 @@ function playChime() {
   } catch {}
 }
 
-export default function GlobalChatNotifier({ userId, role }: { userId?: string; role?: string | null }) {
+export default function GlobalChatNotifier({ userId: initialUserId, role: initialRole }: { userId?: string; role?: string | null }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [userId, setUserId] = useState<string | undefined>(initialUserId)
+  const [role, setRole] = useState<string | null | undefined>(initialRole)
   const seenIdsRef = useRef<Set<string>>(new Set())
-  const lastCheckTimeRef = useRef<number>(Date.now() - 10000)
+  const lastCheckTimeRef = useRef<number>(Date.now() - 5000)
   const isCheckingRef = useRef(false)
+
+  // Sync props or fetch /api/auth/me if userId not provided
+  useEffect(() => {
+    if (initialUserId) {
+      setUserId(initialUserId)
+      setRole(initialRole)
+      return
+    }
+    // Fallback: fetch current authenticated user
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.user?.id) {
+          setUserId(data.user.id)
+          setRole(data.user.role)
+        }
+      })
+      .catch(() => {})
+  }, [initialUserId, initialRole])
 
   const isGlobalAdmin = role === 'admin' || role === 'super_admin' || role === 'moderator'
 

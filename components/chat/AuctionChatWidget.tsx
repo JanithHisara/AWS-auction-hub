@@ -34,44 +34,83 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
       const targetAuctionId = e.detail?.auctionId
       if (!targetAuctionId || targetAuctionId === auctionId) {
         setIsOpen(true)
+        setUnreadCount(0)
       }
     }
     window.addEventListener('open-auction-chat', handleOpenChat)
     return () => window.removeEventListener('open-auction-chat', handleOpenChat)
   }, [auctionId])
 
-  // Fetch conversation for this auction
-  const fetchConversation = useCallback(async () => {
+  // Fetch or sync conversation for this auction
+  const fetchConversation = useCallback(async (isSilent = false) => {
     try {
-      const res = await fetch(`/api/chat/conversations?auction_id=${auctionId}`)
+      const res = await fetch(`/api/chat/conversations?auction_id=${auctionId}`, {
+        headers: { 'Cache-Control': 'no-cache' }
+      })
+
       if (res.status === 400) {
         const err = await res.json()
         if (err.error?.includes('ended')) {
           setIsEnded(true)
+          setConversation(null)
+          setMessages([])
           return
         }
       }
-      if (!res.ok) return
+
+      if (!res.ok) {
+        // Conversation might have been deleted by admin
+        if (res.status === 404) {
+          setConversation(null)
+          setMessages([])
+          setUnreadCount(0)
+        }
+        return
+      }
+
       const data = await res.json()
       if (data?.id) {
         setConversation(data)
-        setUnreadCount(data.unread_by_user || 0)
+        // If chat is closed, update unread count for badge
+        if (!isOpen) {
+          setUnreadCount(data.unread_by_user || 0)
+        }
+      } else {
+        // Conversation deleted by admin or doesn't exist yet
+        setConversation(null)
+        setMessages([])
+        setUnreadCount(0)
       }
     } catch (e) {
-      console.error('Failed to load conversation:', e)
+      console.error('Failed to sync conversation:', e)
     }
-  }, [auctionId])
+  }, [auctionId, isOpen])
 
+  // Periodic polling for unread badge when chat is closed
   useEffect(() => {
-    fetchConversation()
+    fetchConversation(false)
+    const interval = setInterval(() => {
+      fetchConversation(true)
+    }, 3500)
+    return () => clearInterval(interval)
   }, [fetchConversation])
 
-  // Fetch messages
+  // Fetch messages when conversation is active and chat is open
   const fetchMessages = useCallback(async (isSilent = false) => {
     if (!conversation?.id) return
     if (!isSilent) setIsLoading(true)
     try {
-      const res = await fetch(`/api/chat/conversations/${conversation.id}/messages`)
+      const res = await fetch(`/api/chat/conversations/${conversation.id}/messages`, {
+        headers: { 'Cache-Control': 'no-cache' }
+      })
+
+      if (res.status === 404) {
+        // Admin deleted the conversation
+        setConversation(null)
+        setMessages([])
+        return
+      }
+
       if (!res.ok) return
       const data = await res.json()
       if (Array.isArray(data)) {
@@ -87,29 +126,33 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
     }
   }, [conversation?.id])
 
+  // Handle open state: fetch messages, mark read, and poll while open
   useEffect(() => {
-    if (!conversation?.id || !isOpen) return
+    if (!isOpen) return
 
-    fetchMessages(false)
-    setTimeout(scrollToBottom, 100)
-
-    // Mark as read
-    fetch(`/api/chat/conversations/${conversation.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'mark_read' }),
-    }).catch(() => {})
     setUnreadCount(0)
 
-    // Poll messages every 3s while open for reliable delivery
-    const timer = setInterval(() => {
-      fetchMessages(true)
-    }, 3000)
+    if (conversation?.id) {
+      fetchMessages(false)
+      setTimeout(scrollToBottom, 100)
 
-    return () => clearInterval(timer)
-  }, [conversation?.id, isOpen, fetchMessages, scrollToBottom])
+      // Mark read in DB
+      fetch(`/api/chat/conversations/${conversation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark_read' }),
+      }).catch(() => {})
 
-  // Realtime subscription via Supabase if available
+      // Poll messages every 2.5s while open
+      const timer = setInterval(() => {
+        fetchMessages(true)
+      }, 2500)
+
+      return () => clearInterval(timer)
+    }
+  }, [isOpen, conversation?.id, fetchMessages, scrollToBottom])
+
+  // Realtime Supabase subscription
   useEffect(() => {
     if (!conversation?.id || !isOpen) return
 
@@ -137,6 +180,7 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
     }
   }, [conversation?.id, isOpen, userId, supabase, scrollToBottom])
 
+  // Send message
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || isSending || isEnded) return
@@ -148,6 +192,7 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
     try {
       let convId = conversation?.id
 
+      // If conversation doesn't exist in local state, create it first
       if (!convId) {
         const convRes = await fetch('/api/chat/conversations', {
           method: 'POST',
@@ -176,11 +221,31 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
       setMessages(prev => [...prev, optimistic])
       setTimeout(scrollToBottom, 50)
 
-      const res = await fetch(`/api/chat/conversations/${convId}/messages`, {
+      let res = await fetch(`/api/chat/conversations/${convId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: messageContent }),
       })
+
+      // If conversation was deleted by admin (404), seamlessly re-create conversation and retry!
+      if (res.status === 404) {
+        const newConvRes = await fetch('/api/chat/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ auction_id: auctionId }),
+        })
+        const newConvData = await newConvRes.json()
+        if (newConvData?.id) {
+          setConversation(newConvData)
+          convId = newConvData.id
+          optimistic.conversation_id = newConvData.id
+          res = await fetch(`/api/chat/conversations/${convId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: messageContent }),
+          })
+        }
+      }
 
       if (!res.ok) throw new Error('Failed to send message')
 
@@ -201,17 +266,20 @@ export default function AuctionChatWidget({ auctionId, userId }: Props) {
 
   return (
     <>
-      {/* Floating chat button */}
+      {/* Floating chat button with unread red badge */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            setIsOpen(true)
+            setUnreadCount(0)
+          }}
           className="fixed bottom-4 left-4 z-50 w-14 h-14 bg-[var(--gold)] hover:bg-[var(--gold-dark)] text-black rounded-full shadow-lg shadow-[var(--gold-glow)] flex items-center justify-center transition-all hover:scale-105 active:scale-95"
           aria-label="Open support chat"
         >
           <MessageCircle className="w-6 h-6" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-              {unreadCount > 9 ? '9+' : unreadCount}
+            <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1 bg-red-600 border-2 border-[var(--background)] text-white text-[11px] font-black rounded-full flex items-center justify-center shadow-lg animate-pulse">
+              {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
         </button>

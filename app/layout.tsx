@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import AutoRefresh from "@/components/layout/AutoRefresh";
 import GlobalChatNotifier from "@/components/chat/GlobalChatNotifier";
-import { createClient } from "@/lib/supabase/server";
-import { getUserRole } from "@/lib/auth";
+import { getCurrentUser, getUserRole } from "@/lib/auth";
+import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,18 +22,15 @@ export const metadata: Metadata = {
   description: "Premium auctions for collectors",
 };
 
-export const dynamic = 'force-dynamic'
-
-import { ConfirmProvider } from "@/components/ui/ConfirmProvider"
+export const dynamic = 'force-dynamic';
 
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const role = await getUserRole()
+  const user = await getCurrentUser();
+  const role = await getUserRole();
 
   return (
     <html lang="en">
@@ -43,12 +40,10 @@ export default async function RootLayout({
         <ConfirmProvider>
           <AutoRefresh userId={user?.id} />
           <GlobalChatNotifier userId={user?.id} role={role} />
-        <Navbar user={user} role={role} />
-        {children}
+          <Navbar user={user} role={role} />
+          {children}
         </ConfirmProvider>
       </body>
     </html>
   );
 }
-
-
