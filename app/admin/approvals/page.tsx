@@ -7,6 +7,9 @@ import ApprovalsClient from '@/components/admin/ApprovalsClient'
 import { requirePermission } from '@/lib/auth'
 import { PERMISSIONS } from '@/lib/permissions'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 async function getData(status?: string) {
   const user = await requirePermission(PERMISSIONS.MANAGE_REGISTRATIONS)
 

@@ -49,21 +49,41 @@ export async function GET(request: NextRequest) {
       console.error('Schedule processing error in sync route:', schedErr)
     }
 
-    // 2. Fetch minimal states to construct the system state fingerprint
-    const [auctions, latestBid, regCount, activeGems, userRegs] = await Promise.all([
+    // 2. Fetch system states to construct a comprehensive real-time fingerprint
+    const [
+      auctions,
+      totalBids,
+      latestBid,
+      totalRegs,
+      pendingRegs,
+      approvedRegs,
+      gems,
+      activeHolds,
+      winnersCount,
+      userRegs,
+    ] = await Promise.all([
       prisma.auction.findMany({
         select: { id: true, status: true },
       }),
+      prisma.bid.count(),
       prisma.bid.findFirst({
         orderBy: { createdAt: 'desc' },
-        select: { id: true },
+        select: { id: true, bidAmount: true },
+      }),
+      prisma.auctionRegistration.count(),
+      prisma.auctionRegistration.count({
+        where: { approvalStatus: 'pending' },
       }),
       prisma.auctionRegistration.count({
         where: { approvalStatus: 'approved' },
       }),
-      prisma.gem.count({
-        where: { status: 'active' },
+      prisma.gem.findMany({
+        select: { id: true, status: true, currentPrice: true, roundEndTime: true },
       }),
+      prisma.bidderHold.count({
+        where: { isActive: true },
+      }),
+      prisma.auctionWinner.count(),
       userId
         ? prisma.auctionRegistration.findMany({
             where: { userId },
@@ -73,8 +93,13 @@ export async function GET(request: NextRequest) {
     ])
 
     const liveCount = auctions.filter(a => a.status === 'live').length
-    const auctionStatusStr = auctions
+    const auctionStr = auctions
       .map(a => `${a.id}:${a.status}`)
+      .sort()
+      .join(',')
+
+    const gemStr = gems
+      .map(g => `${g.id}:${g.status}:${g.currentPrice || 0}:${g.roundEndTime?.toISOString() || ''}`)
       .sort()
       .join(',')
 
@@ -83,7 +108,19 @@ export async function GET(request: NextRequest) {
       .sort()
       .join(',')
 
-    const fingerprint = `${liveCount}|${auctionStatusStr}|${latestBid?.id || ''}|${regCount}|${activeGems}|${userRegStr}`
+    const fingerprint = [
+      liveCount,
+      auctionStr,
+      gemStr,
+      totalBids,
+      latestBid ? `${latestBid.id}:${latestBid.bidAmount}` : 'no-bids',
+      totalRegs,
+      pendingRegs,
+      approvedRegs,
+      activeHolds,
+      winnersCount,
+      userRegStr,
+    ].join('|')
 
     return NextResponse.json({
       ok: true,

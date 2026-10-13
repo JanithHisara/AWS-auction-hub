@@ -1,4 +1,4 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -6,6 +6,9 @@ import { AuctionRegistration, RegistrationApprovalStatus } from '@/types/databas
 import RegistrationStatusActions from '@/components/admin/RegistrationStatusActions'
 import LocalTime from '@/components/ui/LocalTime'
 import { ADMIN_ROLES } from '@/lib/permissions'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 async function getData(auctionId: string, status?: string) {
   const supabase = await createClient()

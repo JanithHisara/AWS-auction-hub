@@ -1,9 +1,12 @@
-﻿import { requireAuth } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency } from '@/lib/utils'
 import { redirect } from 'next/navigation'
 import PaymentForm from '@/components/payment/PaymentForm'
 import Link from 'next/link'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 
 export default async function PaymentPage({ params }: { params: Promise<{ gemId: string }> }) {
   const { gemId } = await params

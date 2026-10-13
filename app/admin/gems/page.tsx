@@ -1,10 +1,13 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { PERMISSIONS } from '@/lib/permissions'
 import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
 import { GemStatus } from '@/types/database'
 import LocalTime from '@/components/ui/LocalTime'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export default async function GemsPage() {
   const user = await requirePermission(PERMISSIONS.MANAGE_ITEMS)

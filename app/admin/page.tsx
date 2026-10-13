@@ -5,6 +5,9 @@ import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 async function getStats() {
   const user = await requirePermission(PERMISSIONS.VIEW_DASHBOARD)
   const supabase = await createClient()

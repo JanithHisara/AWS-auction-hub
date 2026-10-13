@@ -1,6 +1,9 @@
-﻿import AuctionMonitorClient from '@/components/monitor/AuctionMonitorClient'
+import AuctionMonitorClient from '@/components/monitor/AuctionMonitorClient'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 
 export default async function AuctionMonitorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

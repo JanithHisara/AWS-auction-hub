@@ -1,6 +1,9 @@
 import { requirePermission } from '@/lib/auth'
 import { PERMISSIONS } from '@/lib/permissions'
 import NfcManagementClient from '@/components/admin/NfcManagementClient'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 
 export default async function NfcManagementPage() {
   await requirePermission(PERMISSIONS.MANAGE_DEVICES)

@@ -1,7 +1,10 @@
-﻿import { requireAuth } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import MyBidsClient from './MyBidsClient'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 
 interface BidWithDetails {
   id: string

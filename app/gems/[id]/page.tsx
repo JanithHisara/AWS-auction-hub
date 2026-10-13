@@ -1,7 +1,10 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound } from 'next/navigation'
 import GemDetailClient from '@/components/gems/GemDetailClient'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 
 async function getGem(id: string) {
   const supabase = await createClient()

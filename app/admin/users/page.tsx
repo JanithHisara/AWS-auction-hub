@@ -2,6 +2,9 @@ import { requirePermission, getCurrentUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { PERMISSIONS } from '@/lib/permissions'
 import UsersClient from '@/components/admin/UsersClient'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 
 export default async function UsersPage() {
   await requirePermission(PERMISSIONS.MANAGE_USERS)

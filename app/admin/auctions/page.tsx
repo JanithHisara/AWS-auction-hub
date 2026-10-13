@@ -6,6 +6,9 @@ import { ADMIN_ROLES } from '@/lib/permissions'
 import LocalTime from '@/components/ui/LocalTime'
 import { getAuctionTypeLabel } from '@/lib/auction-types'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 async function getAuctions() {
   const supabase = await createClient()
   

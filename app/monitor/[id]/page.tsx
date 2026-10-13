@@ -1,6 +1,9 @@
 import MonitorClient from '@/components/monitor/MonitorClient'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 
 export default async function MonitorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

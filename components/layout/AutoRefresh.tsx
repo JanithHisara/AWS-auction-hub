@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useCallback } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 interface Props {
   userId?: string
@@ -9,17 +9,11 @@ interface Props {
 
 export default function AutoRefresh({ userId }: Props) {
   const router = useRouter()
-  const pathname = usePathname()
   const lastFingerprint = useRef<string | null>(null)
   const isSyncing = useRef(false)
   const pendingRefresh = useRef(false)
 
-  const isAuctionRoom = pathname?.includes('/auction-room/')
-
   const doRefresh = useCallback(() => {
-    // Avoid refreshing if inside auction-room to protect real-time bidding inputs
-    if (isAuctionRoom) return
-
     // If user is currently typing in an input field, delay refresh so cursor/typing isn't lost
     const activeEl = document.activeElement
     const isTyping =
@@ -35,10 +29,10 @@ export default function AutoRefresh({ userId }: Props) {
 
     pendingRefresh.current = false
     router.refresh()
-  }, [isAuctionRoom, router])
+  }, [router])
 
   const checkSync = useCallback(async () => {
-    if (isSyncing.current || isAuctionRoom) return
+    if (isSyncing.current) return
     if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
 
     isSyncing.current = true
@@ -68,23 +62,18 @@ export default function AutoRefresh({ userId }: Props) {
     } finally {
       isSyncing.current = false
     }
-  }, [userId, isAuctionRoom, doRefresh])
+  }, [userId, doRefresh])
 
-  // Periodic polling every 3.5 seconds
+  // Periodic polling every 3 seconds across all pages
   useEffect(() => {
-    if (isAuctionRoom) return
-
-    // Run initial sync check
     checkSync()
 
-    const interval = setInterval(checkSync, 3500)
+    const interval = setInterval(checkSync, 3000)
     return () => clearInterval(interval)
-  }, [checkSync, isAuctionRoom])
+  }, [checkSync])
 
   // Sync immediately when user switches tabs or window regains focus
   useEffect(() => {
-    if (isAuctionRoom) return
-
     const handleFocusOrVisible = () => {
       if (document.visibilityState === 'visible') {
         checkSync()
@@ -111,7 +100,7 @@ export default function AutoRefresh({ userId }: Props) {
       document.removeEventListener('visibilitychange', handleFocusOrVisible)
       document.removeEventListener('focusout', handleBlurInput)
     }
-  }, [checkSync, doRefresh, isAuctionRoom])
+  }, [checkSync, doRefresh])
 
   return null
 }
