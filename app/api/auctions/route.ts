@@ -1,12 +1,23 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const statusParam = searchParams.get('status')
+
+    // Default to only 'registration_closed' and 'live' auctions
+    const allowedStatuses = statusParam
+      ? statusParam.split(',').map((s) => s.trim())
+      : ['registration_closed', 'live']
+
     const auctions = await prisma.auction.findMany({
+      where: {
+        status: { in: allowedStatuses },
+      },
       select: {
         id: true,
         name: true,
