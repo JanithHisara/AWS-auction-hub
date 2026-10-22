@@ -13,7 +13,7 @@
         "cdk:diff": "cd cdk && npx cdk diff --profile gem-auction",
         "cdk:deploy": "cd cdk && npx cdk deploy --profile gem-auction --require-approval never",
         "cdk:destroy": "cd cdk && npx cdk destroy --profile gem-auction",
-        "postinstall": "prisma skills sync || exit 0"
+        "postinstall": "prisma generate"
     },
     "dependencies": {
         "@aws-sdk/client-iot-data-plane": "^3.400.0",
