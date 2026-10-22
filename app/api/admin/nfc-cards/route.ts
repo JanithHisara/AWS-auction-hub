@@ -1,67 +1,117 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { requirePermission } from '@/lib/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import prisma from '@/lib/prisma'
 import { PERMISSIONS } from '@/lib/permissions'
 import { sendAuctionAccessEmail } from '@/lib/email/resend'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requirePermission(PERMISSIONS.MANAGE_DEVICES)
+    try {
+      await requirePermission(PERMISSIONS.MANAGE_DEVICES)
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
 
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search') || ''
+    const search = searchParams.get('search')?.trim() || ''
     const statusFilter = searchParams.get('status') || ''
     const nfcTypeFilter = searchParams.get('nfc_type') || ''
-    const page = parseInt(searchParams.get('page') || '1')
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const limit = 20
     const offset = (page - 1) * limit
 
-    const adminClient = createAdminClient()
+    const where: any = {}
 
-    let query = adminClient
-      .from('nfc_cards')
-      .select(`
-        id, nfc_uid, user_id, is_active, label, nfc_type, created_at, updated_at,
-        users:users!user_id (id, email, display_name),
-        created_by_user:users!created_by (id, email, display_name)
-      `, { count: 'exact' })
-
+    // Search filter across nfcUid or label
     if (search) {
-      query = query.or(`nfc_uid.ilike.%${search}%,label.ilike.%${search}%`)
+      where.OR = [
+        { nfcUid: { contains: search, mode: 'insensitive' } },
+        { label: { contains: search, mode: 'insensitive' } },
+      ]
     }
 
+    // Active status filter
     if (statusFilter === 'active') {
-      query = query.eq('is_active', true)
+      where.isActive = true
     } else if (statusFilter === 'inactive') {
-      query = query.eq('is_active', false)
+      where.isActive = false
     }
 
-    if (nfcTypeFilter) {
-      query = query.eq('nfc_type', nfcTypeFilter)
+    // Temporary vs Permanent filter
+    // Temporary cards have auctionId assigned; Permanent cards have auctionId as null
+    if (nfcTypeFilter === 'temporary') {
+      where.auctionId = { not: null }
+    } else if (nfcTypeFilter === 'permanent') {
+      where.auctionId = null
     }
 
-    const { data: nfcCards, count, error } = await query
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
+    const [total, nfcCardsRaw] = await Promise.all([
+      prisma.nfcCard.count({ where }),
+      prisma.nfcCard.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: offset,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              displayName: true,
+            },
+          },
+          auction: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      }),
+    ])
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    const nfcCards = nfcCardsRaw.map((card) => ({
+      id: card.id,
+      nfc_uid: card.nfcUid,
+      user_id: card.userId,
+      auction_id: card.auctionId,
+      is_active: card.isActive,
+      label: card.label,
+      nfc_type: card.auctionId ? 'temporary' : 'permanent',
+      created_at: card.createdAt.toISOString(),
+      updated_at: card.updatedAt.toISOString(),
+      users: card.user ? {
+        id: card.user.id,
+        email: card.user.email,
+        display_name: card.user.displayName,
+      } : null,
+      created_by_user: null,
+      auction: card.auction ? {
+        id: card.auction.id,
+        name: card.auction.name,
+      } : null,
+    }))
 
     return NextResponse.json({
       nfcCards,
-      total: count || 0,
+      total,
       page,
-      totalPages: Math.ceil((count || 0) / limit),
+      totalPages: Math.ceil(total / limit) || 1,
     })
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  } catch (error: any) {
+    console.error('Error fetching admin NFC cards:', error)
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requirePermission(PERMISSIONS.MANAGE_DEVICES)
+    try {
+      await requirePermission(PERMISSIONS.MANAGE_DEVICES)
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
 
     const body = await request.json()
     const { nfc_uid, user_id, label, nfc_type, auction_id } = body
@@ -73,111 +123,120 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const adminClient = createAdminClient()
-
-    const { data: targetUser } = await adminClient
-      .from('users')
-      .select('id, email')
-      .eq('id', user_id)
-      .single()
+    const targetUser = await prisma.user.findUnique({
+      where: { id: user_id },
+      select: { id: true, email: true, displayName: true },
+    })
 
     if (!targetUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // NFC UID must be unique (one card = one user)
-    const { data: existing } = await adminClient
-      .from('nfc_cards')
-      .select('id')
-      .eq('nfc_uid', nfc_uid)
-      .limit(1)
+    // NFC UID must be unique
+    const existing = await prisma.nfcCard.findFirst({
+      where: {
+        nfcUid: {
+          equals: nfc_uid.trim(),
+          mode: 'insensitive',
+        },
+      },
+    })
 
-    if (existing && existing.length > 0) {
+    if (existing) {
       return NextResponse.json(
         { error: 'This NFC card is already registered' },
         { status: 409 },
       )
     }
 
-    const { data: nfcCard, error } = await adminClient
-      .from('nfc_cards')
-      .insert({
-        nfc_uid,
-        user_id,
-        label: label || null,
-        nfc_type: nfc_type || 'permanent',
-        is_active: true,
-      })
-      .select(`
-        id, nfc_uid, user_id, is_active, label, nfc_type, created_at, updated_at,
-        users:users!user_id (id, email, display_name),
-        created_by_user:users!created_by (id, email, display_name)
-      `)
-      .single()
+    const assignedAuctionId = (nfc_type === 'temporary' && auction_id) ? auction_id : null
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    const newCard = await prisma.nfcCard.create({
+      data: {
+        nfcUid: nfc_uid.trim(),
+        userId: user_id,
+        label: label?.trim() || null,
+        auctionId: assignedAuctionId,
+        isActive: true,
+      },
+      include: {
+        user: {
+          select: { id: true, email: true, displayName: true },
+        },
+        auction: {
+          select: { id: true, name: true, description: true, auctionStart: true },
+        },
+      },
+    })
 
-    if (auction_id && nfc_type === 'temporary') {
-      const { randomUUID } = require('crypto')
+    // Auto-register for auction if temporary card
+    if (assignedAuctionId && nfc_type === 'temporary') {
       const token = randomUUID()
-      
-      // Check if already registered
-      const { data: existingReg } = await adminClient
-        .from('auction_registrations')
-        .select('id')
-        .eq('auction_id', auction_id)
-        .eq('user_id', user_id)
-        .limit(1)
-        
-      if (!existingReg || existingReg.length === 0) {
-        const { error: regError } = await adminClient.from('auction_registrations').insert({
-          auction_id,
-          user_id,
-          access_token: token,
-          approval_status: 'approved',
-          approved_at: new Date().toISOString(),
-          is_active: true
-        })
-        if (regError) {
-          console.error("Auction registration error:", regError)
-        } else if (targetUser.email) {
-          // Fetch auction details for the email
-          const { data: auction } = await adminClient
-            .from('auctions')
-            .select('name, description, auction_start')
-            .eq('id', auction_id)
-            .single()
 
-          if (auction) {
-            try {
-              const auctionDate = new Date(auction.auction_start).toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-              
-              await sendAuctionAccessEmail({
-                to: targetUser.email,
-                auctionName: auction.name,
-                auctionDate,
-                auctionDescription: auction.description,
-                accessToken: token,
-              })
-            } catch (emailErr) {
-              console.error('Failed to send confirm email:', emailErr)
-            }
+      const existingReg = await prisma.auctionRegistration.findFirst({
+        where: {
+          auctionId: assignedAuctionId,
+          userId: user_id,
+        },
+      })
+
+      if (!existingReg) {
+        await prisma.auctionRegistration.create({
+          data: {
+            auctionId: assignedAuctionId,
+            userId: user_id,
+            accessToken: token,
+            approvalStatus: 'approved',
+            approvedAt: new Date(),
+            isActive: true,
+          },
+        })
+
+        if (targetUser.email && newCard.auction) {
+          try {
+            const auctionDate = new Date(newCard.auction.auctionStart).toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+
+            await sendAuctionAccessEmail({
+              to: targetUser.email,
+              auctionName: newCard.auction.name,
+              auctionDate,
+              auctionDescription: newCard.auction.description || '',
+              accessToken: token,
+            })
+          } catch (emailErr) {
+            console.error('Failed to send confirm email:', emailErr)
           }
         }
       }
     }
 
-    return NextResponse.json({ nfcCard }, { status: 201 })
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    return NextResponse.json({
+      nfcCard: {
+        id: newCard.id,
+        nfc_uid: newCard.nfcUid,
+        user_id: newCard.userId,
+        auction_id: newCard.auctionId,
+        is_active: newCard.isActive,
+        label: newCard.label,
+        nfc_type: newCard.auctionId ? 'temporary' : 'permanent',
+        created_at: newCard.createdAt.toISOString(),
+        updated_at: newCard.updatedAt.toISOString(),
+        users: {
+          id: targetUser.id,
+          email: targetUser.email,
+          display_name: targetUser.displayName,
+        },
+      },
+    }, { status: 201 })
+  } catch (error: any) {
+    console.error('Error creating NFC card:', error)
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }

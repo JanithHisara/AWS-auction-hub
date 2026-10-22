@@ -1,4 +1,4 @@
-﻿import prisma from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import { broadcastEvent } from '@/lib/events'
 import crypto from 'crypto'
 
@@ -658,7 +658,7 @@ export class PostgresQueryBuilder<T = any> {
     const clause = this.selectClause
 
     // Expand user join
-    if (clause.includes('user:users') || clause.includes('user:users!')) {
+    if (clause.includes('user:users') || clause.includes('user:users!') || clause.includes('users:users') || clause.includes('users!')) {
       const userIds = Array.from(new Set(rows.map(r => r.user_id || r.admin_id).filter(Boolean)))
       if (userIds.length > 0) {
         const users = await prisma.$queryRawUnsafe<any[]>(
@@ -668,7 +668,9 @@ export class PostgresQueryBuilder<T = any> {
         const userMap = new Map(sanitizeRow(users).map((u: any) => [u.id, u]))
         for (const r of rows) {
           const uid = r.user_id || r.admin_id
-          r.user = userMap.get(uid) || null
+          const u = userMap.get(uid) || null
+          r.user = u
+          r.users = u
         }
       }
     }

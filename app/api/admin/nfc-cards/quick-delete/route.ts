@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import prisma from '@/lib/prisma'
 import { PERMISSIONS } from '@/lib/permissions'
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission(PERMISSIONS.MANAGE_DEVICES)
+    try {
+      await requirePermission(PERMISSIONS.MANAGE_DEVICES)
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
 
     const body = await request.json()
     const { nfc_uid } = body
@@ -14,33 +18,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'NFC UID is required' }, { status: 400 })
     }
 
-    const adminClient = createAdminClient()
+    const card = await prisma.nfcCard.findFirst({
+      where: {
+        nfcUid: {
+          equals: nfc_uid.trim(),
+          mode: 'insensitive',
+        },
+      },
+    })
 
-    const { data: card, error: findError } = await adminClient
-      .from('nfc_cards')
-      .select('id, nfc_type')
-      .eq('nfc_uid', nfc_uid)
-      .single()
-
-    if (findError || !card) {
+    if (!card) {
       return NextResponse.json({ error: 'NFC Card not found' }, { status: 404 })
     }
 
-    if (card.nfc_type !== 'temporary') {
+    // Only cards associated with an auction (temporary cards) can be deleted via quick delete
+    if (!card.auctionId) {
       return NextResponse.json({ error: 'Only temporary NFC cards can be deleted using this method' }, { status: 403 })
     }
 
-    const { error: deleteError } = await adminClient
-      .from('nfc_cards')
-      .delete()
-      .eq('id', card.id)
-
-    if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 500 })
-    }
+    await prisma.nfcCard.delete({
+      where: { id: card.id },
+    })
 
     return NextResponse.json({ success: true }, { status: 200 })
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  } catch (error: any) {
+    console.error('Error in quick delete NFC card:', error)
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }
