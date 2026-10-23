@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface Props {
   roundEndTime: string | null
@@ -10,6 +10,16 @@ interface Props {
 
 export default function AuctionCountdown({ roundEndTime, forceStop = false, onExpire }: Props) {
   const [timeLeft, setTimeLeft] = useState('')
+  const hasExpiredRef = useRef(false)
+  const lastEndTimeRef = useRef<string | null>(null)
+
+  // Reset expired ref whenever roundEndTime changes
+  useEffect(() => {
+    if (roundEndTime !== lastEndTimeRef.current) {
+      lastEndTimeRef.current = roundEndTime
+      hasExpiredRef.current = false
+    }
+  }, [roundEndTime])
 
   useEffect(() => {
     if (!roundEndTime) {
@@ -24,11 +34,15 @@ export default function AuctionCountdown({ roundEndTime, forceStop = false, onEx
 
       if (distance <= 0 || forceStop) {
         setTimeLeft('00:00')
-        if (distance <= 0 && onExpire) {
+        if (distance <= 0 && onExpire && !hasExpiredRef.current) {
+          hasExpiredRef.current = true
           onExpire()
         }
         return
       }
+
+      // If distance > 0 and was reset
+      hasExpiredRef.current = false
 
       const hours = Math.floor(distance / (1000 * 60 * 60))
       const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))

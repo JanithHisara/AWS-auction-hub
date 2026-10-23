@@ -1,3 +1,4 @@
+import { broadcastEvent } from '@/lib/events'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requireAuctionManager } from '@/lib/auth'
@@ -34,6 +35,38 @@ export async function POST(
 
     if (error) throw error
 
+    try {
+      const { data: currentGem } = await adminDb.from('gems').select('auction_id').eq('id', id).single();
+      broadcastEvent({
+        channel: `item-monitor-auction-${currentGem?.auction_id || ''}`,
+        table: 'gems',
+        eventType: 'UPDATE',
+        new: {
+          id,
+          auction_id: currentGem?.auction_id,
+          round_end_time: roundEnd.toISOString(),
+          status: 'active',
+        },
+      });
+    } catch (bErr) {
+      console.warn('Realtime broadcast error on start-round:', bErr);
+    }
+    try {
+      const { data: currentGem } = await adminDb.from('gems').select('auction_id').eq('id', id).single();
+      broadcastEvent({
+        channel: `item-monitor-auction-${currentGem?.auction_id || ''}`,
+        table: 'gems',
+        eventType: 'UPDATE',
+        new: {
+          id,
+          auction_id: currentGem?.auction_id,
+          round_end_time: roundEnd.toISOString(),
+          status: 'active',
+        },
+      });
+    } catch (bErr) {
+      console.warn('Realtime broadcast error on start-round:', bErr);
+    }
     return NextResponse.json({ message: 'Round started', round_end_time: roundEnd })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to start round'

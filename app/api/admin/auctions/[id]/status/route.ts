@@ -1,4 +1,5 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { broadcastEvent } from '@/lib/events'
+import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuctionManager } from '@/lib/auth'
 import { PERMISSIONS } from '@/lib/permissions'
@@ -16,6 +17,8 @@ export async function POST(
 
     let status: string
     const contentType = request.headers.get('content-type')
+    
+    
     
     if (contentType?.includes('application/json')) {
       const body = await request.json()
@@ -64,6 +67,28 @@ export async function POST(
     if (error) {
       console.error('Update error:', error)
       return NextResponse.json({ error: 'Failed to update: ' + error.message }, { status: 500 })
+    }
+
+    try {
+      broadcastEvent({
+        channel: `item-monitor-auction-${id}`,
+        table: 'auctions',
+        eventType: 'UPDATE',
+        new: { id, status },
+      });
+    } catch (bErr) {
+      console.warn('Realtime broadcast error on status update:', bErr);
+    }
+
+    try {
+      broadcastEvent({
+        channel: `item-monitor-auction-${id}`,
+        table: 'auctions',
+        eventType: 'UPDATE',
+        new: { id, status },
+      });
+    } catch (bErr) {
+      console.warn('Realtime broadcast error on status update:', bErr);
     }
 
     if (status === 'registration_closed' || status === 'ended') {

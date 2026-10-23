@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -8,6 +11,13 @@ export async function GET(
   try {
     const { id } = await params
     const supabase = await createClient()
+
+    // Auto-process any pending transitions
+    try {
+      await supabase.rpc('process_auction_schedule')
+    } catch {
+      // Non-critical if RPC not present
+    }
 
     // Get auction with items ordered by start time
     const { data: auction } = await supabase
@@ -38,20 +48,29 @@ export async function GET(
       .eq('auction_id', id)
       .order('start_time', { ascending: true })
 
+    const noCacheHeaders = {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    }
+
     if (!items || items.length === 0) {
-      return NextResponse.json({ 
-        auction,
-        currentItem: null,
-        nextItem: null,
-        allItems: [],
-        message: 'No items in this auction' 
-      })
+      return NextResponse.json(
+        { 
+          auction,
+          currentItem: null,
+          nextItem: null,
+          allItems: [],
+          message: 'No items in this auction' 
+        },
+        { headers: noCacheHeaders }
+      )
     }
 
     // Find current active item (first item that is 'active')
     const currentItem = items.find(item => item.status === 'active')
     
-    // Find next item (first item that is still 'draft' after current)
+    // Find next item (first item after current)
     const currentIndex = currentItem ? items.findIndex(i => i.id === currentItem.id) : -1
     const nextItem = currentIndex >= 0 && currentIndex < items.length - 1 
       ? items[currentIndex + 1] 
@@ -121,14 +140,17 @@ export async function GET(
     // Check for finished items to show results
     const finishedItems = items.filter(i => i.status === 'ended' || i.status === 'completed')
     
-    return NextResponse.json({
-      auction,
-      currentItem: currentItem ? { ...currentItem, ...bidData } : null,
-      nextItem,
-      allItems: items.map(i => ({ id: i.id, name: i.name, status: i.status })),
-      finishedCount: finishedItems.length,
-      totalItems: items.length,
-    })
+    return NextResponse.json(
+      {
+        auction,
+        currentItem: currentItem ? { ...currentItem, ...bidData } : null,
+        nextItem,
+        allItems: items.map(i => ({ id: i.id, name: i.name, status: i.status })),
+        finishedCount: finishedItems.length,
+        totalItems: items.length,
+      },
+      { headers: noCacheHeaders }
+    )
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })

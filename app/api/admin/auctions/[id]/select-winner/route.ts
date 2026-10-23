@@ -1,3 +1,4 @@
+import { broadcastEvent } from '@/lib/events'
 ﻿import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requirePermission, requireAuctionManager } from '@/lib/auth'
@@ -123,7 +124,35 @@ export async function POST(
           .update({ status: 'active' })
           .eq('id', nextPendingItem.id)
         
-        console.log(`Auto-activated next item: ${nextPendingItem.name}`)
+        console.log(`Auto-activated next item: ${nextPendingItem.name}`);
+        try {
+          broadcastEvent({
+            channel: `item-monitor-auction-${gem.auction_id}`,
+            table: 'gems',
+            eventType: 'UPDATE',
+            new: {
+              id: nextPendingItem.id,
+              auction_id: gem.auction_id,
+              status: 'active',
+            },
+          });
+        } catch (bErr) {
+          console.warn('Realtime broadcast error on next item activation:', bErr);
+        };
+        try {
+          broadcastEvent({
+            channel: `item-monitor-auction-${gem.auction_id}`,
+            table: 'gems',
+            eventType: 'UPDATE',
+            new: {
+              id: nextPendingItem.id,
+              auction_id: gem.auction_id,
+              status: 'active',
+            },
+          });
+        } catch (bErr) {
+          console.warn('Realtime broadcast error on next item activation:', bErr);
+        }
       }
     }
 
@@ -160,6 +189,46 @@ export async function POST(
       }
     }
 
+    try {
+      broadcastEvent({
+        channel: `item-monitor-auction-${gem?.auction_id || ''}`,
+        table: 'gems',
+        eventType: 'UPDATE',
+        new: {
+          id,
+          auction_id: gem?.auction_id,
+          status: 'completed',
+        },
+      });
+    } catch (bErr) {
+      console.warn('Realtime broadcast error on select-winner:', bErr);
+    }
+    try {
+      broadcastEvent({
+        channel: `item-monitor-auction-${gem?.auction_id || ''}`,
+        table: 'gems',
+        eventType: 'UPDATE',
+        new: {
+          id,
+          auction_id: gem?.auction_id,
+          status: 'completed',
+        },
+      });
+      if (nextPendingItem) {
+        broadcastEvent({
+          channel: `item-monitor-auction-${gem?.auction_id || ''}`,
+          table: 'gems',
+          eventType: 'UPDATE',
+          new: {
+            id: nextPendingItem.id,
+            auction_id: gem?.auction_id,
+            status: 'active',
+          },
+        });
+      }
+    } catch (bErr) {
+      console.warn('Realtime broadcast error on select-winner:', bErr);
+    }
     return NextResponse.json(winner)
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to select winner'

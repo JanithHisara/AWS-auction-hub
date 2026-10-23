@@ -1,3 +1,4 @@
+import { broadcastEvent } from '@/lib/events'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requireAuctionManager } from '@/lib/auth'
 import { PERMISSIONS } from '@/lib/permissions'
@@ -40,6 +41,36 @@ export async function POST(
 
     if (error) throw error
 
+    try {
+      broadcastEvent({
+        channel: `item-monitor-auction-${gem?.auction_id || ''}`,
+        table: 'gems',
+        eventType: 'UPDATE',
+        new: {
+          id,
+          auction_id: gem?.auction_id,
+          round_end_time: null,
+          status: updateData.status || 'active',
+        },
+      });
+    } catch (bErr) {
+      console.warn('Realtime broadcast error on end-round:', bErr);
+    }
+    try {
+      broadcastEvent({
+        channel: `item-monitor-auction-${gem?.auction_id || ''}`,
+        table: 'gems',
+        eventType: 'UPDATE',
+        new: {
+          id,
+          auction_id: gem?.auction_id,
+          round_end_time: null,
+          status: updateData.status || 'active',
+        },
+      });
+    } catch (bErr) {
+      console.warn('Realtime broadcast error on end-round:', bErr);
+    }
     return NextResponse.json({ message: 'Round ended', status: isFreeForm ? 'ended' : undefined })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to end round'

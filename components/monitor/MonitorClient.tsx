@@ -67,7 +67,7 @@ export default function MonitorClient({ gemId }: { gemId: string }) {
 
   const fetchData = async () => {
     try {
-      const res = await fetch(`/api/gems/${gemId}/monitor-data`)
+      const res = await fetch(`/api/gems/${gemId}/monitor-data?t=${Date.now()}`, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' } })
       if (res.ok) {
         const newData = await res.json()
         if (data && newData.highestBid > data.highestBid) {

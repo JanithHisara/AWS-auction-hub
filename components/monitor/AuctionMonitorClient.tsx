@@ -79,7 +79,7 @@ export default function AuctionMonitorClient({ auction: initialAuction }: Props)
   // Refresh auction and items from API
   const refreshAuctionData = async () => {
     try {
-      const res = await fetch(`/api/auctions/${auction.id}/current-item`)
+      const res = await fetch(`/api/auctions/${auction.id}/current-item?t=${Date.now()}`, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' } })
       if (res.ok) {
         const currentData = await res.json()
         if (currentData?.allItems) {

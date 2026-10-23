@@ -1,3 +1,4 @@
+import { broadcastEvent } from '@/lib/events'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth } from '@/lib/auth'
@@ -219,6 +220,50 @@ export async function POST(
       if (gemError) throw gemError
     }
 
+    try {
+      broadcastEvent({
+        channel: `item-monitor-auction-${gem.auction_id || ''}`,
+        table: 'bids',
+        eventType: 'INSERT',
+        new: bid,
+      });
+      broadcastEvent({
+        channel: `item-monitor-auction-${gem.auction_id || ''}`,
+        table: 'gems',
+        eventType: 'UPDATE',
+        new: {
+          id,
+          auction_id: gem.auction_id,
+          current_price: bidAmount,
+          highest_bid: bidAmount,
+          round_end_time: auctionType === 'progressive_elimination_auction' ? new Date().toISOString() : gem.round_end_time,
+        },
+      });
+    } catch (broadcastErr) {
+      console.warn('Realtime broadcast error on bid:', broadcastErr);
+    }
+    try {
+      broadcastEvent({
+        channel: `item-monitor-auction-${gem.auction_id || ''}`,
+        table: 'bids',
+        eventType: 'INSERT',
+        new: bid,
+      });
+      broadcastEvent({
+        channel: `item-monitor-auction-${gem.auction_id || ''}`,
+        table: 'gems',
+        eventType: 'UPDATE',
+        new: {
+          id,
+          auction_id: gem.auction_id,
+          current_price: bidAmount,
+          highest_bid: bidAmount,
+          round_end_time: auctionType === 'progressive_elimination_auction' ? new Date().toISOString() : gem.round_end_time,
+        },
+      });
+    } catch (broadcastErr) {
+      console.warn('Realtime broadcast error on bid:', broadcastErr);
+    }
     return NextResponse.json(bid)
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to place bid'
@@ -318,6 +363,26 @@ export async function PATCH(
 
     if (updateError) throw updateError
 
+    try {
+      broadcastEvent({
+        channel: `item-monitor-auction-${gem.auction_id || ''}`,
+        table: 'bids',
+        eventType: 'UPDATE',
+        new: updatedBid,
+      });
+    } catch (broadcastErr) {
+      console.warn('Realtime broadcast error on update bid:', broadcastErr);
+    }
+    try {
+      broadcastEvent({
+        channel: `item-monitor-auction-${gem.auction_id || ''}`,
+        table: 'bids',
+        eventType: 'UPDATE',
+        new: updatedBid,
+      });
+    } catch (broadcastErr) {
+      console.warn('Realtime broadcast error on update bid:', broadcastErr);
+    }
     return NextResponse.json(updatedBid)
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to update bid'

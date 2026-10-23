@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import AuctionCountdown from '@/components/shared/AuctionCountdown'
 import { AuctionHammerIcon } from '@/components/brand/Logo'
@@ -19,7 +19,8 @@ interface ItemData {
   bidCount: number
   uniqueBidders: number
   highestBid: number
-  recentBids: { id: string; bid_amount: number; created_at: string }[]; allRegisteredBiddersBid?: boolean;
+  recentBids: { id: string; bid_amount: number; created_at: string }[]
+  allRegisteredBiddersBid?: boolean
 }
 
 interface MonitorData {
@@ -56,40 +57,52 @@ function formatTime(dateStr: string) {
 export default function ItemMonitorClient({ auctionId, auctionName }: { auctionId: string; auctionName: string }) {
   const [data, setData] = useState<MonitorData | null>(null)
   const [currentTime, setCurrentTime] = useState(new Date())
-    const [flashPrice, setFlashPrice] = useState(false)
+  const [flashPrice, setFlashPrice] = useState(false)
   const [showFinished, setShowFinished] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const supabase = createClient()
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(`/api/auctions/${auctionId}/current-item`)
+      setIsRefreshing(true)
+      const res = await fetch(`/api/auctions/${auctionId}/current-item?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      })
       if (res.ok) {
         const newData = await res.json()
-        if (data?.currentItem && newData.currentItem) {
-          // Flash when price increases
-          if (newData.currentItem.highestBid > data.currentItem.highestBid) {
-            setFlashPrice(true)
-            setTimeout(() => setFlashPrice(false), 1500)
+        setData(prev => {
+          if (prev?.currentItem && newData.currentItem) {
+            // Flash when price increases
+            if (newData.currentItem.highestBid > prev.currentItem.highestBid) {
+              setFlashPrice(true)
+              setTimeout(() => setFlashPrice(false), 1500)
+            }
+            // Show finished message when item changes
+            if (newData.currentItem.id !== prev.currentItem.id) {
+              setShowFinished(true)
+              setTimeout(() => setShowFinished(false), 3000)
+            }
           }
-          // Show finished message when item changes
-          if (newData.currentItem.id !== data.currentItem.id) {
-            setShowFinished(true)
-            setTimeout(() => setShowFinished(false), 3000)
-          }
-        }
-        setData(newData)
+          return newData
+        })
       }
     } catch (e) {
-      console.error(e)
+      console.error('Monitor fetch error:', e)
+    } finally {
+      setIsRefreshing(false)
     }
-  }
+  }, [auctionId])
 
-  // Initial fetch and clock
+  // Initial fetch and 1-second clock
   useEffect(() => {
     fetchData()
     const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(clockTimer)
-  }, [auctionId])
+  }, [fetchData])
 
   // Realtime subscriptions to bids, gems, and auctions
   useEffect(() => {
@@ -104,26 +117,24 @@ export default function ItemMonitorClient({ auctionId, auctionName }: { auctionI
         event: '*', 
         schema: 'public', 
         table: 'gems', 
-        filter: `auction_id=eq.${auctionId}`, 
       }, () => fetchData())
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'auctions', 
-        filter: `id=eq.${auctionId}`, 
       }, () => fetchData())
       .subscribe()
 
-    // Active polling fallback every 2.5 seconds
-    const pollInterval = setInterval(fetchData, 2500)
+    // Active polling fallback every 2 seconds
+    const pollInterval = setInterval(fetchData, 2000)
 
     return () => {
       supabase.removeChannel(channel)
       clearInterval(pollInterval)
     }
-  }, [auctionId, supabase])
+  }, [auctionId, supabase, fetchData])
 
-if (!data) {
+  if (!data) {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
         <div className="text-[var(--gold)] text-xl animate-pulse">Loading Monitor...</div>
@@ -135,6 +146,31 @@ if (!data) {
   const isItemFinished = !currentItem && finishedCount === totalItems
   const isSealed = auction?.auction_type === 'tender_base_fixed_bid'
 
+  // Determine round ended state
+  let isRoundEnded = false
+  let roundStatusText = 'ROUND ENDED'
+
+  if (currentItem?.round_end_time) {
+    const roundEndMs = new Date(currentItem.round_end_time).getTime()
+    if (currentTime.getTime() >= roundEndMs) {
+      isRoundEnded = true
+      roundStatusText = 'ROUND TIME EXPIRED'
+    }
+  }
+
+  if (auction?.auction_type === 'progressive_elimination_auction' && currentItem) {
+    const hasClaimedBid = (currentItem.recentBids || []).some(
+      b => Number(b.bid_amount) === Number(currentItem.current_price)
+    )
+    if (hasClaimedBid) {
+      isRoundEnded = true
+      roundStatusText = 'PRICE CLAIMED'
+    }
+  } else if (auction?.auction_type === 'incremental_approval_auction' && currentItem?.allRegisteredBiddersBid) {
+    isRoundEnded = true
+    roundStatusText = 'ALL BIDDERS APPROVED'
+  }
+
   return (
     <div className="monitor-display min-h-screen bg-[#0a0a0f] text-white overflow-hidden">
       {/* Scanline effect */}
@@ -144,7 +180,6 @@ if (!data) {
       {showFinished && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
           <div className="text-center animate-fade-in">
-            <div className="text-6xl mb-4"></div>
             <div className="text-3xl font-bold text-[var(--gold)] mb-2">Item Finished!</div>
             <div className="text-xl text-white/60">Loading next item...</div>
           </div>
@@ -180,7 +215,19 @@ if (!data) {
             </div>
           </div>
           
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <button
+              onClick={() => fetchData()}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--gold)]/10 hover:bg-[var(--gold)]/20 border border-[var(--gold)]/30 text-xs text-[var(--gold)] transition-colors cursor-pointer"
+              title="Click to refresh monitor"
+            >
+              <svg className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="hidden sm:inline font-mono">{isRefreshing ? 'SYNCING...' : 'SYNC'}</span>
+            </button>
+
             <div className="text-center">
               <div className="text-xs text-[var(--gold)]/60 uppercase">Progress</div>
               <div className="text-xl font-bold text-white">{finishedCount}/{totalItems}</div>
@@ -219,7 +266,7 @@ if (!data) {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-8xl opacity-30"></div>
+                    <div className="w-full h-full flex items-center justify-center text-8xl opacity-30">💎</div>
                   )}
                 </div>
 
@@ -233,7 +280,7 @@ if (!data) {
               
               {/* Center: Current Price */}
               <div className={`flex flex-col items-center justify-center ${isSealed ? 'lg:col-span-7' : 'lg:col-span-4'}`}>
-                <div className="price-display">
+                <div className="price-display w-full max-w-md">
                   <div className="text-sm sm:text-lg text-[var(--gold)]/60 uppercase tracking-[0.2em] mb-4">
                     {isSealed ? 'Initial Price' : 'Current Price'}
                   </div>
@@ -246,24 +293,30 @@ if (!data) {
                     </div>
                   )}
                   
-                  {/* Countdown */}
-                  {data?.currentItem?.round_end_time && (
+                  {/* Countdown / Round Status */}
+                  {currentItem.round_end_time && (
                     <div className="countdown-box">
                       <div className="text-xs text-[var(--gold)]/60 uppercase tracking-widest mb-2">
-                        {'Round Ends In'}
+                        {isRoundEnded ? 'Round Status' : 'Round Ends In'}
                       </div>
-                      <div className="text-4xl sm:text-5xl font-mono font-bold text-white tabular-nums">
-                            {(() => {
-      let forceStop = false;
-      if (data?.auction?.auction_type === 'progressive_elimination_auction') {
-        const hasClaimedBid = (data?.currentItem?.recentBids || []).some(b => Number(b.bid_amount) === Number(data?.currentItem?.current_price));
-        if (hasClaimedBid) { forceStop = true; }
-      } else if (data?.auction?.auction_type === 'incremental_approval_auction') {
-        if (data?.currentItem?.allRegisteredBiddersBid) { forceStop = true; }
-      }
-      return <AuctionCountdown roundEndTime={data?.currentItem?.round_end_time || null} forceStop={forceStop} onExpire={fetchData} />;
-    })()}
+                      <div className="text-3xl sm:text-5xl font-mono font-bold text-white tabular-nums">
+                        {isRoundEnded ? (
+                          <span className="text-amber-400 text-2xl sm:text-3xl font-bold animate-pulse">
+                            {roundStatusText}
+                          </span>
+                        ) : (
+                          <AuctionCountdown 
+                            roundEndTime={currentItem.round_end_time} 
+                            forceStop={isRoundEnded} 
+                            onExpire={fetchData} 
+                          />
+                        )}
                       </div>
+                      {isRoundEnded && (
+                        <div className="text-xs text-[var(--gold)]/80 mt-2 font-mono tracking-wider animate-pulse">
+                          {roundStatusText === 'PRICE CLAIMED' ? 'BID ACCEPTED • AWAITING NEXT ROUND' : 'AWAITING ADMIN ACTION'}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -295,13 +348,13 @@ if (!data) {
                       ))
                     ) : (
                       <div className="no-bids">
-                        <span className="text-4xl mb-3"></span>
+                        <span className="text-4xl mb-3">🏷️</span>
                         <span>Waiting for bids...</span>
                       </div>
                     )}
                   </div>
                   <div className="privacy-notice">
-                    Bidder identities are hidden until auction ends
+                    BIDDER IDENTITIES ARE HIDDEN UNTIL AUCTION ENDS
                   </div>
                 </div>
               </div>
@@ -311,14 +364,12 @@ if (!data) {
         ) : isItemFinished ? (
           /* All Items Finished */
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-            <div className="text-8xl mb-6"></div>
             <h1 className="text-4xl font-black text-[var(--gold)] mb-4">Auction Complete!</h1>
             <p className="text-xl text-white/60">All {totalItems} items have finished bidding.</p>
           </div>
         ) : (
           /* Waiting for First Item */
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-            <div className="text-8xl mb-6 animate-pulse"></div>
             <h1 className="text-4xl font-black text-white mb-4">Waiting for Auction to Start</h1>
             <p className="text-xl text-white/60">The first item will appear here when bidding begins.</p>
           </div>
@@ -543,4 +594,3 @@ function StatCard({ label, value, highlight = false }: { label: string; value: s
     </div>
   )
 }
-
