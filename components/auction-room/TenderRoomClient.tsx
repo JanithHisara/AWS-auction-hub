@@ -6,7 +6,7 @@ import AuctionChatWidget from '@/components/chat/AuctionChatWidget'
 import { createClient } from '@/lib/supabase/client'
 import AuctionCountdown from '@/components/shared/AuctionCountdown'
 import { Auction, Gem, Bid, AuctionRegistration, User } from '@/types/database'
-import { Check, Loader2, Lock } from 'lucide-react'
+import { Check, Loader2, Lock, LogOut } from 'lucide-react'
 import MediaRenderer from '@/components/gems/MediaRenderer'
 import ImageCarousel from '@/components/ui/ImageCarousel'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -41,6 +41,7 @@ export default function TenderRoomClient({ auction, items: initialItems, user, r
   const [submittingGems, setSubmittingGems] = useState<Record<string, boolean>>({})
   const router = useRouter()
   const [currentAuctionStatus, setCurrentAuctionStatus] = useState(auction.status)
+  const [showLeavePopup, setShowLeavePopup] = useState(false)
 
   useEffect(() => {
     setCurrentAuctionStatus(auction.status)
@@ -52,7 +53,7 @@ export default function TenderRoomClient({ auction, items: initialItems, user, r
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'auctions',
           filter: 'id=eq.' + auction.id,
@@ -61,6 +62,7 @@ export default function TenderRoomClient({ auction, items: initialItems, user, r
           if (payload.new && payload.new.status) {
             setCurrentAuctionStatus(payload.new.status)
           }
+          router.refresh()
         }
       )
       .on(
@@ -75,10 +77,27 @@ export default function TenderRoomClient({ auction, items: initialItems, user, r
           router.refresh()
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bids',
+        },
+        () => {
+          router.refresh()
+        }
+      )
       .subscribe()
+
+    // Polling fallback every 3 seconds
+    const interval = setInterval(() => {
+      router.refresh()
+    }, 3000)
 
     return () => {
       supabase.removeChannel(channel)
+      clearInterval(interval)
     }
   }, [auction.id, supabase, router])
 
@@ -151,6 +170,32 @@ export default function TenderRoomClient({ auction, items: initialItems, user, r
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 min-h-[calc(100vh-4rem)] flex flex-col">
+      {/* Leave Auction Popup */}
+      {showLeavePopup && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl animate-bounce-in">
+            <h3 className="text-xl font-bold text-white mb-2">Leave Auction?</h3>
+            <p className="text-[var(--text-secondary)] text-sm mb-6">
+              Are you sure you want to leave? You can always rejoin using your access link if the auction is still active.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLeavePopup(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-[var(--border)] text-white hover:bg-[var(--background)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => window.location.href = '/my-auctions'}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold transition-colors"
+              >
+                Yes, Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
@@ -167,11 +212,21 @@ export default function TenderRoomClient({ auction, items: initialItems, user, r
           </div>
         </div>
         
-        <div className="flex flex-col items-end">
-          <p className="text-sm text-[var(--text-secondary)] mb-1">Bidding Ends In</p>
-          <div className="text-xl sm:text-2xl font-bold text-[var(--gold)] tabular-nums">
-            <AuctionCountdown roundEndTime={auction.auction_end} onExpire={() => window.location.reload()} />
+        <div className="flex items-center gap-4 sm:gap-6">
+          <div className="flex flex-col items-end">
+            <p className="text-sm text-[var(--text-secondary)] mb-1">Bidding Ends In</p>
+            <div className="text-xl sm:text-2xl font-bold text-[var(--gold)] tabular-nums">
+              <AuctionCountdown roundEndTime={auction.auction_end} onExpire={() => window.location.reload()} />
+            </div>
           </div>
+          <button
+            onClick={() => setShowLeavePopup(true)}
+            className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-full transition-colors text-sm font-medium border border-red-500/30 shrink-0"
+            title="Leave Auction"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:inline">Leave</span>
+          </button>
         </div>
       </div>
 

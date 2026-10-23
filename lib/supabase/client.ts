@@ -286,9 +286,12 @@ class RealtimeChannel {
                 const match = filter.filter.match(/^([a-zA-Z0-9_]+)=eq\.(.+)$/)
                 if (match) {
                   const col = match[1]
-                  const expected = match[2]
+                  const expected = match[2].trim().replace(/^['"]|['"]$/g, '')
                   const row = payload.new || payload.old || {}
-                  if (String(row[col]) !== expected) {
+                  const toCamel = (s) => s.replace(/_([a-z])/g, (_, g) => g.toUpperCase())
+                  const toSnake = (s) => s.replace(/[A-Z]/g, (l) => '_' + l.toLowerCase())
+                  const val = row[col] ?? row[toCamel(col)] ?? row[toSnake(col)]
+                  if (val === undefined || val === null || String(val).toLowerCase() !== expected.toLowerCase()) {
                     continue
                   }
                 }

@@ -256,14 +256,28 @@ export default async function AuctionDetailPage({ params }: { params: Promise<{ 
                       existingStatus={auction.registration?.approval_status}
                     />
                     
-                    {isLive && auction.registration?.approval_status === 'approved' && auction.registration?.access_token && (
-                      <Link 
-                        href={`/auction-room/${auction.registration.access_token}`}
-                        className="btn-live w-full flex items-center justify-center gap-2"
-                      >
-                        <span className="live-dot" />
-                        Enter Auction Room
-                      </Link>
+                    {auction.registration?.approval_status === 'approved' && auction.registration?.access_token && (
+                      isLive ? (
+                        <Link 
+                          href={`/auction-room/${auction.registration.access_token}`}
+                          className="btn-live w-full flex items-center justify-center gap-2"
+                        >
+                          <span className="live-dot" />
+                          Enter Live Auction Room
+                        </Link>
+                      ) : (
+                        <div className="space-y-2">
+                          <Link 
+                            href={`/auction-room/${auction.registration.access_token}`}
+                            className="px-4 py-2.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-xl w-full flex items-center justify-center gap-2 text-sm font-bold transition-all shadow-lg"
+                          >
+                            <span>Access Granted &bull; Open Auction Room</span>
+                          </Link>
+                          <p className="text-[11px] text-center text-[var(--text-muted)]">
+                            Your pass is active. You can enter to view items before bidding starts.
+                          </p>
+                        </div>
+                      )
                     )}
                   </div>
                 ) : canRegister ? (

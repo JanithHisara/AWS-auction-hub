@@ -27,7 +27,6 @@ export default function AuctionLobbyClient({
 
   const pollAuctionStatus = useCallback(async () => {
     try {
-      // Process schedule transitions in case the scheduled start/end time has passed
       await supabase.rpc('process_auction_schedule').catch(() => {})
 
       const { data } = await supabase
@@ -42,9 +41,9 @@ export default function AuctionLobbyClient({
         const prev = lastAuctionStatus.current
         lastAuctionStatus.current = data.status
         if (data.status === 'live' && prev !== 'live') {
-          setNotification({ type: 'live', message: 'The auction is now LIVE! Refreshing...' })
+          setNotification({ type: 'live', message: 'The auction is now LIVE! Unlocking live room...' })
         }
-        setTimeout(() => router.refresh(), 1000)
+        setTimeout(() => router.refresh(), 500)
       } else if (lastAuctionStatus.current === null) {
         lastAuctionStatus.current = data.status
       }
@@ -68,9 +67,9 @@ export default function AuctionLobbyClient({
       if (lastApprovalStatus.current !== null && data.approval_status !== lastApprovalStatus.current) {
         lastApprovalStatus.current = data.approval_status
         if (data.approval_status === 'approved') {
-          setNotification({ type: 'approved', message: 'Your registration has been approved! Refreshing...' })
+          setNotification({ type: 'approved', message: 'Your registration has been approved! Updating room access...' })
         }
-        setTimeout(() => router.refresh(), 1000)
+        setTimeout(() => router.refresh(), 500)
       } else if (lastApprovalStatus.current === null) {
         lastApprovalStatus.current = data.approval_status
       }
@@ -79,7 +78,7 @@ export default function AuctionLobbyClient({
     }
   }, [auctionId, userId, supabase, router])
 
-  // Poll auction & registration status as reliable fallback for serverless environments
+  // Poll auction & registration status as reliable fallback
   useEffect(() => {
     const runPoll = () => {
       pollAuctionStatus()
@@ -87,27 +86,29 @@ export default function AuctionLobbyClient({
     }
 
     runPoll()
-    const interval = setInterval(runPoll, 3000)
+    const interval = setInterval(runPoll, 2500)
     return () => clearInterval(interval)
   }, [userId, pollAuctionStatus, pollRegistrationStatus])
 
+  // Realtime WebSocket channel subscriptions
   useEffect(() => {
     const channel = supabase
       .channel(`lobby-${auctionId}`)
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'auctions',
           filter: `id=eq.${auctionId}`,
         },
         (payload) => {
           const updated = payload.new as { status?: string }
-          if (updated.status === 'live') {
-            setNotification({ type: 'live', message: 'The auction is now LIVE! Refreshing...' })
-            setTimeout(() => router.refresh(), 1500)
-          } else {
+          if (updated && updated.status) {
+            if (updated.status === 'live') {
+              setNotification({ type: 'live', message: 'The auction is now LIVE! Unlocking live room...' })
+            }
+            lastAuctionStatus.current = updated.status
             router.refresh()
           }
         }
@@ -117,42 +118,45 @@ export default function AuctionLobbyClient({
       channel.on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'auction_registrations',
           filter: `auction_id=eq.${auctionId}`,
         },
         (payload) => {
-          const updated = payload.new as { user_id?: string; approval_status?: string }
-          if (updated.user_id === userId) {
-            lastApprovalStatus.current = updated.approval_status || null
-            if (updated.approval_status === 'approved') {
-              setNotification({ type: 'approved', message: 'Your registration has been approved! Refreshing...' })
+          const row = payload.new as any || {}
+          const rowUserId = row.user_id || row.userId
+          if (rowUserId === userId) {
+            const approval = row.approval_status || row.approvalStatus
+            lastApprovalStatus.current = approval || null
+            if (approval === 'approved') {
+              setNotification({ type: 'approved', message: 'Your registration has been approved! Updating room access...' })
             }
-            setTimeout(() => router.refresh(), 1500)
+            router.refresh()
           }
         }
       )
     }
 
-    // Listen for gem updates (round changes)
+    // Listen for gem updates (round changes & price changes)
     channel.on(
       'postgres_changes',
       {
-        event: 'UPDATE',
+        event: '*',
         schema: 'public',
         table: 'gems',
       },
       (payload) => {
-        const updated = payload.new as { auction_id?: string; round_end_time?: string | null; current_price?: number; status?: string }
-        if (updated.auction_id === auctionId) {
+        const updated = payload.new as any || {}
+        const gemAuctionId = updated.auction_id || updated.auctionId
+        if (gemAuctionId === auctionId) {
           if (updated.status === 'active' && updated.round_end_time === null) {
             setNotification({ type: 'round_ended', message: 'Round has ended. Waiting for next round...' })
-            setTimeout(() => setNotification(null), 5000)
+            setTimeout(() => setNotification(null), 4000)
           }
           if (updated.round_end_time && updated.current_price) {
-            setNotification({ type: 'next_round', message: 'New round has started!' })
-            setTimeout(() => setNotification(null), 5000)
+            setNotification({ type: 'next_round', message: 'New bidding round has started!' })
+            setTimeout(() => setNotification(null), 4000)
           }
           router.refresh()
         }
@@ -180,9 +184,9 @@ export default function AuctionLobbyClient({
                   : 'bg-blue-500 text-white'
           }`}>
             <span>{
-              notification.type === 'approved' ? '' :
-              notification.type === 'live' ? '' :
-              notification.type === 'round_ended' ? '' : ''
+              notification.type === 'approved' ? '✓' :
+              notification.type === 'live' ? '🔴' :
+              notification.type === 'round_ended' ? '⏱' : '⚡'
             }</span>
             {notification.message}
           </div>
@@ -192,4 +196,3 @@ export default function AuctionLobbyClient({
     </>
   )
 }
-

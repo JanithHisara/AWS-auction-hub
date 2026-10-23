@@ -91,36 +91,37 @@ export default function ItemMonitorClient({ auctionId, auctionName }: { auctionI
     return () => clearInterval(clockTimer)
   }, [auctionId])
 
-  // Realtime subscriptions
+  // Realtime subscriptions to bids, gems, and auctions
   useEffect(() => {
-    if (!data?.currentItem) return
-
     const channel = supabase
-      .channel(`item-monitor-${data.currentItem.id}`)
+      .channel(`item-monitor-auction-${auctionId}`)
       .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'bids', 
-        filter: `gem_id=eq.${data.currentItem.id}` 
+        event: '*', 
+        schema: 'public', 
+        table: 'bids', 
       }, () => fetchData())
       .on('postgres_changes', { 
-        event: 'UPDATE', 
+        event: '*', 
         schema: 'public', 
         table: 'gems', 
-        filter: `id=eq.${data.currentItem.id}` 
+        filter: `auction_id=eq.${auctionId}`, 
+      }, () => fetchData())
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'auctions', 
+        filter: `id=eq.${auctionId}`, 
       }, () => fetchData())
       .subscribe()
 
+    // Active polling fallback every 2.5 seconds
+    const pollInterval = setInterval(fetchData, 2500)
+
     return () => {
       supabase.removeChannel(channel)
+      clearInterval(pollInterval)
     }
-  }, [data?.currentItem?.id, supabase])
-
-  // Poll for item changes (backup for when item status changes)
-  useEffect(() => {
-    const pollInterval = setInterval(fetchData, 5000)
-    return () => clearInterval(pollInterval)
-  }, [auctionId])
+  }, [auctionId, supabase])
 
 if (!data) {
     return (

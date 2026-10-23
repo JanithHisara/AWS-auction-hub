@@ -93,21 +93,25 @@ export default function MonitorClient({ gemId }: { gemId: string }) {
     const channel = supabase
       .channel(`item-monitor-${gemId}`)
       .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'bids', 
+        event: '*', 
+        schema: 'public', 
+        table: 'bids', 
         filter: `gem_id=eq.${gemId}` 
       }, () => fetchData())
       .on('postgres_changes', { 
-        event: 'UPDATE', 
+        event: '*', 
         schema: 'public', 
         table: 'gems', 
         filter: `id=eq.${gemId}` 
       }, () => fetchData())
       .subscribe()
 
+    // Polling fallback every 2.5 seconds
+    const interval = setInterval(fetchData, 2500)
+
     return () => {
       supabase.removeChannel(channel)
+      clearInterval(interval)
     }
   }, [gemId, supabase])
 

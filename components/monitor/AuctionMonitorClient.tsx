@@ -76,54 +76,72 @@ export default function AuctionMonitorClient({ auction: initialAuction }: Props)
     return () => clearInterval(timer)
   }, [])
 
-  // Realtime bid updates
+  // Refresh auction and items from API
+  const refreshAuctionData = async () => {
+    try {
+      const res = await fetch(`/api/auctions/${auction.id}/current-item`)
+      if (res.ok) {
+        const currentData = await res.json()
+        if (currentData?.allItems) {
+          setAuction(prev => ({
+            ...prev,
+            status: currentData.auction?.status || prev.status,
+            items: prev.items.map(i => {
+              const fresh = currentData.allItems.find((ci: any) => ci.id === i.id)
+              return fresh ? { ...i, status: fresh.status } : i
+            })
+          }))
+        }
+      }
+    } catch {
+      // Ignore background error
+    }
+  }
+
+  // Realtime WebSocket subscriptions (bids, gems, auctions, registrations)
   useEffect(() => {
     const channel = supabase
       .channel(`auction-monitor-${auction.id}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'bids',
         },
         async (payload) => {
-          const newBid = payload.new as { gem_id: string; bid_amount: number; user_id: string; created_at: string }
-          
-          // Check if this bid belongs to our auction items
+          const newBid = payload.new as any
+          if (!newBid || !newBid.gem_id) return
+
           const item = auction.items.find(i => i.id === newBid.gem_id)
           if (!item) return
 
-          // Get bidder name
           const { data: user } = await supabase
             .from('users')
             .select('anonymous_name, display_name')
             .eq('id', newBid.user_id)
             .single()
 
-          // Add to recent bids ticker
           setRecentBids(prev => [
             {
               item: item.name,
-              amount: newBid.bid_amount,
-              bidder: user?.anonymous_name || 'Anonymous',
-              time: formatTime(newBid.created_at),
+              amount: Number(newBid.bid_amount),
+              bidder: user?.anonymous_name || user?.display_name || 'Anonymous',
+              time: formatTime(newBid.created_at || new Date().toISOString()),
             },
             ...prev.slice(0, 19),
           ])
 
-          // Flash the item
           setFlashItem(item.id)
           setTimeout(() => setFlashItem(null), 1500)
 
-          // Update item data
           setAuction(prev => ({
             ...prev,
             items: prev.items.map(i => {
               if (i.id === newBid.gem_id) {
                 return {
                   ...i,
-                  highestBid: Math.max(i.highestBid, newBid.bid_amount),
+                  highestBid: Math.max(i.highestBid, Number(newBid.bid_amount)),
                   bidCount: i.bidCount + 1,
                 }
               }
@@ -132,10 +150,69 @@ export default function AuctionMonitorClient({ auction: initialAuction }: Props)
           }))
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'gems',
+          filter: `auction_id=eq.${auction.id}`,
+        },
+        (payload) => {
+          const updatedGem = payload.new as any
+          if (updatedGem && updatedGem.id) {
+            setAuction(prev => ({
+              ...prev,
+              items: prev.items.map(i => {
+                if (i.id === updatedGem.id) {
+                  return {
+                    ...i,
+                    status: updatedGem.status || i.status,
+                    current_price: updatedGem.current_price !== undefined ? Number(updatedGem.current_price) : i.current_price,
+                    highestBid: updatedGem.current_price !== undefined ? Math.max(i.highestBid, Number(updatedGem.current_price)) : i.highestBid,
+                  }
+                }
+                return i
+              })
+            }))
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'auctions',
+          filter: `id=eq.${auction.id}`,
+        },
+        (payload) => {
+          const updated = payload.new as any
+          if (updated && updated.status) {
+            setAuction(prev => ({ ...prev, status: updated.status }))
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'auction_registrations',
+          filter: `auction_id=eq.${auction.id}`,
+        },
+        () => {
+          setAuction(prev => ({ ...prev, registeredCount: (prev.registeredCount || 0) + 1 }))
+        }
+      )
       .subscribe()
+
+    // Polling fallback every 3 seconds
+    const interval = setInterval(refreshAuctionData, 3000)
 
     return () => {
       supabase.removeChannel(channel)
+      clearInterval(interval)
     }
   }, [auction.id, auction.items, supabase])
 
