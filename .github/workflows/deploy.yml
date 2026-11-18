@@ -1,0 +1,106 @@
+name: Validate, build and deploy AuctionHub
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: auctionhub-deployment-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder
+      - run: npm run typecheck
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder
+      - run: npm test
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder
+      - run: npm run build
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder
+          API_ORIGIN: http://backend:4000
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-south-1
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: AWS OIDC authentication
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.backend
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/auctionhub-backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.frontend
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/auctionhub-frontend:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+      - name: Deploy through Systems Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$EC2_INSTANCE_ID"
+          COMPOSE_B64="$(base64 -w0 docker-compose.prod.yml)"
+          CADDY_B64="$(base64 -w0 Caddyfile)"
+          SCRIPT_B64="$(base64 -w0 deploy.sh)"
+          jq -n --arg compose "$COMPOSE_B64" --arg caddy "$CADDY_B64" --arg script "$SCRIPT_B64" --arg tag "$GITHUB_SHA"             '{commands: [
+              "set -e",
+              "mkdir -p /opt/auctionhub",
+              ("printf %s " + $compose + " | base64 -d > /opt/auctionhub/docker-compose.prod.yml"),
+              ("printf %s " + $caddy + " | base64 -d > /opt/auctionhub/Caddyfile"),
+              ("printf %s " + $script + " | base64 -d > /opt/auctionhub/deploy.sh"),
+              ("chmod 700 /opt/auctionhub/deploy.sh && bash /opt/auctionhub/deploy.sh " + $tag)
+            ]}' > /tmp/auctionhub-ssm-command.json
+          CMD_ID="$(aws ssm send-command             --instance-ids "$EC2_INSTANCE_ID"             --document-name AWS-RunShellScript             --comment "AuctionHub deployment $GITHUB_SHA"             --parameters file:///tmp/auctionhub-ssm-command.json             --query 'Command.CommandId' --output text)"
+          echo "AWS SSM command: $CMD_ID"
+          STATUS=Unknown
+          for attempt in $(seq 1 120); do
+            STATUS="$(aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$EC2_INSTANCE_ID" --query Status --output text 2>/dev/null || true)"
+            case "$STATUS" in
+              Success) break ;;
+              Failed|Cancelled|TimedOut|DeliveryTimedOut|ExecutionTimedOut) break ;;
+            esac
+            sleep 5
+          done
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$EC2_INSTANCE_ID"             --query '[Status,StandardOutputContent,StandardErrorContent]' --output text || true
+          test "$STATUS" = Success

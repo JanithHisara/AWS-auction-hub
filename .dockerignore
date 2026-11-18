@@ -1,0 +1,14 @@
+node_modules
+.npm-cache
+.next
+.git
+.gitignore
+.env*
+!.env.example
+.aws
+.codex
+.agents
+tests
+uploads
+*.tsbuildinfo
+npm-debug.log

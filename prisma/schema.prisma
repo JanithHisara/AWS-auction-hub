@@ -1,0 +1,424 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AuctionType {
+  incremental_approval_auction
+  progressive_elimination_auction
+  tender_base_fixed_bid
+}
+
+enum NfcType {
+  permanent
+  temporary
+}
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  passwordHash    String?   @map("password_hash")
+  displayName     String?   @map("display_name")
+  anonymousName   String?   @map("anonymous_name")
+  phone           String?
+  role            String    @default("user")
+  isActive        Boolean   @default(true) @map("is_active")
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  createdAuctions       Auction[]             @relation("AuctionCreator")
+  moderatorAuctions     Auction[]             @relation("AuctionDirectModerator")
+  moderatedAuctions     AuctionModerator[]
+  createdGems           Gem[]                 @relation("GemCreator")
+  registrations         AuctionRegistration[]
+  bids                  Bid[]
+  eliminations          GemElimination[]
+  wins                  AuctionWinner[]       @relation("Winner")
+  selectedWins          AuctionWinner[]       @relation("WinnerSelector")
+  bidderHolds           BidderHold[]          @relation("HeldBidder")
+  createdHolds          BidderHold[]          @relation("HoldCreator")
+  nfcCards              NfcCard[]             @relation("NfcCardOwner")
+  createdNfcCards       NfcCard[]             @relation("NfcCardCreator")
+  sessions              UserSession[]
+  payments              Payment[]
+  conversations         ChatConversation[]
+  sentMessages          ChatMessage[]
+  userRoles             UserRole[]
+  assignedConversations ChatConversation[]    @relation("ChatAssignee")
+  passwordResetTokens   PasswordResetToken[]
+  rewards               UserRewards?
+
+  @@map("users")
+}
+
+model Auction {
+  id               String      @id @default(uuid()) @db.Uuid
+  createdById      String      @map("admin_id") @db.Uuid
+  moderatorId      String?     @map("moderator_id") @db.Uuid
+  name             String
+  description      String?
+  auctionCode      String      @unique @map("auction_code")
+  bannerImageUrl   String?     @map("banner_image_url")
+  passwordHash     String?     @map("password_hash")
+  auctionType      AuctionType @map("auction_type")
+  status           String      @default("draft")
+  publishedAt      DateTime?   @map("published_at") @db.Timestamptz(6)
+  registrationStart DateTime?  @map("registration_start") @db.Timestamptz(6)
+  registrationEnd  DateTime?   @map("registration_end") @db.Timestamptz(6)
+  auctionStart     DateTime?   @map("auction_start") @db.Timestamptz(6)
+  auctionEnd       DateTime?   @map("auction_end") @db.Timestamptz(6)
+  maxParticipants  Int?        @map("max_participants")
+  entryFee         Decimal     @default(0) @map("entry_fee") @db.Decimal(14, 2)
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  creator        User                  @relation("AuctionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  moderator      User?                 @relation("AuctionDirectModerator", fields: [moderatorId], references: [id], onDelete: SetNull)
+  moderators     AuctionModerator[]
+  gems           Gem[]
+  registrations AuctionRegistration[]
+  bidderHolds    BidderHold[]
+  payments       Payment[]
+  conversations ChatConversation[]
+  nfcCards       NfcCard[]
+
+  @@index([auctionType, status])
+  @@index([createdById])
+  @@index([moderatorId])
+  @@map("auctions")
+}
+
+model AuctionModerator {
+  auctionId  String   @map("auction_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(6)
+
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([auctionId, userId])
+  @@index([userId])
+  @@map("auction_moderators")
+}
+
+model Gem {
+  id                String    @id @default(uuid()) @db.Uuid
+  auctionId         String    @map("auction_id") @db.Uuid
+  createdById       String?   @map("admin_id") @db.Uuid
+  name              String
+  description       String?
+  startingPrice     Decimal   @map("starting_price") @db.Decimal(14, 2)
+  currentPrice      Decimal?  @map("current_price") @db.Decimal(14, 2)
+  minBidIncrement   Decimal   @default(100) @map("min_bid_increment") @db.Decimal(14, 2)
+  incrementInterval Int       @default(60) @map("increment_interval")
+  status            String    @default("draft")
+  startTime         DateTime? @map("start_time") @db.Timestamptz(6)
+  endTime           DateTime? @map("end_time") @db.Timestamptz(6)
+  roundEndTime      DateTime? @map("round_end_time") @db.Timestamptz(6)
+  publishedAt       DateTime? @map("published_at") @db.Timestamptz(6)
+  caratWeight       Decimal?  @map("carat_weight") @db.Decimal(8, 3)
+  color             String?
+  provenance        String?
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  auction       Auction           @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  creator       User?             @relation("GemCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  images        GemImage[]
+  certificates  GemCertificate[]
+  bids          Bid[]
+  eliminations  GemElimination[]
+  winner        AuctionWinner?
+  payments      Payment[]
+
+  @@index([auctionId, status])
+  @@index([createdById])
+  @@map("gems")
+}
+
+model GemImage {
+  id           String   @id @default(uuid()) @db.Uuid
+  gemId        String   @map("gem_id") @db.Uuid
+  imageUrl     String   @map("image_url")
+  mediaType    String   @default("image") @map("media_type")
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  gem Gem @relation(fields: [gemId], references: [id], onDelete: Cascade)
+
+  @@index([gemId, displayOrder])
+  @@map("gem_images")
+}
+
+model GemCertificate {
+  id              String   @id @default(uuid()) @db.Uuid
+  gemId           String   @map("gem_id") @db.Uuid
+  certificateUrl  String   @map("certificate_url")
+  certificateType String?  @map("certificate_type")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  gem Gem @relation(fields: [gemId], references: [id], onDelete: Cascade)
+
+  @@index([gemId])
+  @@map("gem_certificates")
+}
+
+model AuctionRegistration {
+  id             String    @id @default(uuid()) @db.Uuid
+  auctionId      String    @map("auction_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  accessTokenHash String?  @unique @map("access_token_hash")
+  approvalStatus String    @default("pending") @map("approval_status")
+  isActive       Boolean   @default(true) @map("is_active")
+  approvedAt     DateTime? @map("approved_at") @db.Timestamptz(6)
+  firstAccessAt  DateTime? @map("first_access_at") @db.Timestamptz(6)
+  lastAccessAt   DateTime? @map("last_access_at") @db.Timestamptz(6)
+  accessCount    Int       @default(0) @map("access_count")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([auctionId, userId])
+  @@index([auctionId, approvalStatus])
+  @@index([userId])
+  @@map("auction_registrations")
+}
+
+model Bid {
+  id          String   @id @default(uuid()) @db.Uuid
+  gemId       String   @map("gem_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  bidAmount   Decimal  @map("bid_amount") @db.Decimal(14, 2)
+  pointsEarned Int     @default(0) @map("points_earned")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  gem    Gem  @relation(fields: [gemId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  winner AuctionWinner?
+
+  @@index([gemId, bidAmount])
+  @@index([gemId, userId])
+  @@index([userId, createdAt])
+  @@map("bids")
+}
+
+model GemElimination {
+  id                 String   @id @default(uuid()) @db.Uuid
+  gemId              String   @map("gem_id") @db.Uuid
+  userId             String   @map("user_id") @db.Uuid
+  eliminatedAt       DateTime @default(now()) @map("eliminated_at") @db.Timestamptz(6)
+  priceAtElimination Decimal? @map("price_at_elimination") @db.Decimal(14, 2)
+
+  gem  Gem  @relation(fields: [gemId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gemId, userId])
+  @@index([userId])
+  @@map("gem_eliminations")
+}
+
+model AuctionWinner {
+  id              String   @id @default(uuid()) @db.Uuid
+  gemId           String   @unique @map("gem_id") @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  winningBidId    String?  @unique @map("winning_bid_id") @db.Uuid
+  winningAmount   Decimal? @map("winning_amount") @db.Decimal(14, 2)
+  selectedById    String?  @map("admin_id") @db.Uuid
+  selectedAt      DateTime @default(now()) @map("selected_at") @db.Timestamptz(6)
+
+  gem        Gem   @relation(fields: [gemId], references: [id], onDelete: Cascade)
+  user       User  @relation("Winner", fields: [userId], references: [id], onDelete: Restrict)
+  winningBid Bid?  @relation(fields: [winningBidId], references: [id], onDelete: SetNull)
+  selectedBy User? @relation("WinnerSelector", fields: [selectedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("auction_winners")
+}
+
+model BidderHold {
+  id          String    @id @default(uuid()) @db.Uuid
+  auctionId   String    @map("auction_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  adminId     String    @map("admin_id") @db.Uuid
+  reason      String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  releasedAt  DateTime? @map("released_at") @db.Timestamptz(6)
+
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  user    User    @relation("HeldBidder", fields: [userId], references: [id], onDelete: Cascade)
+  admin   User    @relation("HoldCreator", fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([auctionId, userId, isActive])
+  @@map("bidder_holds")
+}
+
+model UserSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("user_sessions")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique
+  userRoles   UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique
+  description String?
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model NfcCard {
+  id          String   @id @default(uuid()) @db.Uuid
+  nfcUid      String   @unique @map("nfc_uid")
+  userId      String   @map("user_id") @db.Uuid
+  auctionId   String?  @map("auction_id") @db.Uuid
+  createdById String?  @map("created_by_id") @db.Uuid
+  type        NfcType  @default(permanent) @map("nfc_type")
+  label       String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User     @relation("NfcCardOwner", fields: [userId], references: [id], onDelete: Cascade)
+  auction   Auction? @relation(fields: [auctionId], references: [id], onDelete: SetNull)
+  createdBy User?    @relation("NfcCardCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([auctionId])
+  @@map("nfc_cards")
+}
+
+model Payment {
+  id                String    @id @default(uuid()) @db.Uuid
+  auctionId         String    @map("auction_id") @db.Uuid
+  gemId             String    @map("gem_id") @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  amount            Decimal   @db.Decimal(14, 2)
+  status            String    @default("pending")
+  provider          String?
+  providerReference String?   @unique @map("provider_reference")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  paidAt            DateTime? @map("paid_at") @db.Timestamptz(6)
+
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Restrict)
+  gem     Gem     @relation(fields: [gemId], references: [id], onDelete: Restrict)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, status])
+  @@index([gemId])
+  @@map("payments")
+}
+
+model ChatConversation {
+  id        String   @id @default(uuid()) @db.Uuid
+  auctionId String   @map("auction_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  assignedAdminId String? @map("assigned_admin_id") @db.Uuid
+  status    String   @default("open")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  auction  Auction       @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedAdmin User?    @relation("ChatAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  messages ChatMessage[]
+
+  @@index([auctionId, status])
+  @@index([userId, updatedAt])
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  senderId       String   @map("sender_id") @db.Uuid
+  senderRole     String   @map("sender_role")
+  content        String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User             @relation(fields: [senderId], references: [id], onDelete: Restrict)
+
+  @@index([conversationId, createdAt])
+  @@map("chat_messages")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model UserRewards {
+  id                   String    @id @default(uuid()) @db.Uuid
+  userId               String    @unique @map("user_id") @db.Uuid
+  totalPoints          Int       @default(0) @map("total_points")
+  currentStreak        Int       @default(0) @map("current_streak")
+  longestStreak        Int       @default(0) @map("longest_streak")
+  badges               Json?     @default("[]")
+  auctionsParticipated Int       @default(0) @map("auctions_participated")
+  totalBidsPlaced      Int       @default(0) @map("total_bids_placed")
+  auctionsWon          Int       @default(0) @map("auctions_won")
+  lastBidAt            DateTime? @map("last_bid_at") @db.Timestamptz(6)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_rewards")
+}

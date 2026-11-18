@@ -1,0 +1,83 @@
+services:
+  # ── 1. PostgreSQL Database ──────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: auctionhub_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-auction_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-auctionhub}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── 2. Express Backend API ──────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: auctionhub_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:4000:4000"
+    environment:
+      NODE_ENV: production
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      PORT: 4000
+      API_PORT: 4000
+      API_ORIGIN: "http://localhost:4000"
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:?Set FRONTEND_ORIGINS}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET}
+      CRON_SECRET: ${CRON_SECRET:?Set CRON_SECRET}
+      SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS:?Set SUPER_ADMIN_EMAILS}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      RESEND_REPLY_TO: ${RESEND_REPLY_TO:-}
+    volumes:
+      # Persistent storage for uploaded gem images
+      - app_uploads:/app/uploads
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:4000/health > /dev/null || exit 1" ]
+      interval: 15s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  # ── 3. Next.js Frontend ────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: auctionhub_frontend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      NODE_ENV: production
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      PORT: 3000
+      # Next.js proxies /api and /uploads over Docker internal network to backend container
+      API_ORIGIN: "http://backend:4000"
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET}
+      SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS:?Set SUPER_ADMIN_EMAILS}
+
+volumes:
+  postgres_data:
+  app_uploads:

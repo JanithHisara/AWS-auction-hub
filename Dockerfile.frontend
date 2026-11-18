@@ -1,0 +1,54 @@
+# ── Stage 1: Dependencies ─────────────────────────────────────────────────────
+FROM node:24-alpine AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install dependencies based on package-lock.json
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# ── Stage 2: Builder ────────────────────────────────────────────────────────
+FROM node:24-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Set placeholder environment variables for static build
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+ENV API_ORIGIN="http://backend:4000"
+
+# Generate Prisma Client (needed if server components import Prisma)
+RUN npx prisma generate
+
+# Ensure public directory exists
+RUN mkdir -p public
+
+# Build Next.js
+RUN npm run build
+
+# ── Stage 3: Production Runner ──────────────────────────────────────────────
+FROM node:24-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV API_ORIGIN="http://backend:4000"
+
+# Copy built application and required assets
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.mjs ./next.config.mjs
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+
+RUN chown -R node:node /app/.next
+USER node
+
+EXPOSE 3000
+
+CMD ["npx", "next", "start", "-p", "3000"]
+

@@ -1,0 +1,6 @@
+# Opt-in local Wi-Fi access for the ESP32; merge with docker-compose.yml.
+# The base file retains its loopback binding and keeps PostgreSQL private.
+services:
+  backend:
+    ports:
+      - "${DEVICE_LAN_IP:?Set DEVICE_LAN_IP to this computer's Wi-Fi IPv4 address}:4000:4000"

@@ -1,0 +1,40 @@
+# ── Stage 1: Dependencies ─────────────────────────────────────────────────────
+FROM node:24-alpine AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install dependencies based on package-lock.json
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# ── Stage 2: Production Runner ──────────────────────────────────────────────
+FROM node:24-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV API_PORT=4000
+ENV PORT=4000
+
+# Copy dependencies and server source code
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json ./
+COPY tsconfig.json ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./prisma.config.ts
+COPY server.ts ./server.ts
+COPY api ./api
+COPY lib ./lib
+COPY types ./types
+
+# Generate Prisma Client for the backend
+RUN npx prisma generate
+
+# Create directory for persistent uploads
+RUN mkdir -p uploads && chown node:node uploads
+
+USER node
+
+EXPOSE 4000
+
+CMD ["./node_modules/.bin/tsx", "server.ts"]
+
